@@ -56,7 +56,10 @@ void SERCOM0_2_Handler()
   Serial2.IrqHandler();
 }
 
-
+//RTC//////////////////////////////////////////////////////////////////
+#include "RTClib.h"
+RTC_DS3231 rtc;
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 void setup() {
   //motor//////////////////////////////////////////////////////////////////
@@ -64,13 +67,40 @@ void setup() {
   //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
 
 
-  //display//////////////////////////////////////////////////////////////////
-  Serial.begin(115200);
+  //TTS//////////////////////////////////////////////////////////////////
 
-  Serial.println("128x64 OLED FeatherWing test");
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    abort();
+  }
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
+
+  // When time needs to be re-set on a previously configured device, the
+  // following line sets the RTC to the date & time this sketch was compiled
+  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // This line sets the RTC with an explicit date & time, for example to set
+  // January 21, 2014 at 3am you would call:
+  // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+
+
+
+  //display//////////////////////////////////////////////////////////////////
+  //Serial.begin(115200);
+
+  //Serial.println("128x64 OLED FeatherWing test");
   display.begin(0x3C, true); // Address 0x3C default
 
-  Serial.println("OLED begun");
+  //Serial.println("OLED begun");
 
   // Show image buffer on the display hardware.
   // Since the buffer is intialized with an Adafruit splashscreen
@@ -93,7 +123,34 @@ void setup() {
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
-  display.print("Hello there. I am Zenolith.");
+  display.print("Hello there.");
+  display.println();
+  display.print("I am Zenolith.");
+  display.println();
+
+  display.write("Press Button A to begin Motor Test");
+  display.println();
+
+
+  DateTime now = rtc.now();
+  display.print(now.year(), DEC);
+  display.print('/');
+  display.print(now.month(), DEC);
+  display.print('/');
+  display.print(now.day(), DEC);
+  //  display.print(" (");
+  //  display.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  //  display.print(") ");
+  display.print(" - ");
+
+  display.print(now.hour(), DEC);
+  display.print(':');
+  display.print(now.minute(), DEC);
+  display.print(':');
+  display.print(now.second(), DEC);
+  display.println();
+
+
   display.display(); // actually display all of the above
 
 
@@ -107,6 +164,10 @@ void setup() {
   Serial2.write("V15\n");//Vx Set audio volume (dB): x = -48 to 18
   delay(50);
   Serial2.write("SHELLO there. I am zenolith. Press Button A. To begin Motor Test\n");
+
+
+
+
 }
 
 void loop() {
