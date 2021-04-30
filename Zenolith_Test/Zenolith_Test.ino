@@ -61,6 +61,15 @@ void SERCOM0_2_Handler()
 RTC_DS3231 rtc;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
+
+
+//IMU//////////////////////////////////////////////////////////////////
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
+
+
 void setup() {
   //motor//////////////////////////////////////////////////////////////////
   AFMS.begin();  // create with the default frequency 1.6KHz
@@ -166,18 +175,35 @@ void setup() {
   Serial2.write("SHELLO there. I am zenolith. Press Button A. To begin Motor Test\n");
 
 
+  //IMU//////////////////////////////////////////////////////////////////
+  /* Initialise the sensor */
+  if (!bno.begin())
+  {
+    /* There was a problem detecting the BNO055 ... check your connections */
+    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+    while (1);
+  }
+  delay(1000);
+  bno.setExtCrystalUse(true);
 
 
 }
 
 void loop() {
+
   //motor//////////////////////////////////////////////////////////////////
   if (testMotors) {
     motorTest(m1);
     motorTest(m2);
     motorTest(m3);
   }
+
+
+
+
   //display//////////////////////////////////////////////////////////////////
+  display.clearDisplay();
+  display.setCursor(0, 0);
 
   if (!digitalRead(BUTTON_A)) {
     display.print("Testing Motors");
@@ -187,7 +213,23 @@ void loop() {
   }
   delay(100);
   yield();
+
+  //IMU//////////////////////////////////////////////////////////////////
+  sensors_event_t event;
+  bno.getEvent(&event);
+
+  /* Display the floating point data */
+  display.print("X: ");
+  display.println(event.orientation.x, 4);
+  display.print("Y: ");
+  display.println(event.orientation.y, 4);
+  display.print("Z: ");
+  display.println(event.orientation.z, 4);
+
   display.display();
+
+
+
 }
 
 
