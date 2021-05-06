@@ -2,6 +2,11 @@
 #include <SPI.h>
 #include <Wire.h>
 
+//datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <SD.h>
+const int chipSelect = 10; //m4
+
+
 //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
@@ -73,9 +78,22 @@ sensors_event_t event;
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial);
+  //while (!Serial);
+  delay(3000);
   Serial.println("Hello");
   delay(50);
+
+  //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  Serial.print("Initializing SD card...");
+
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    while (1);
+  }
+  Serial.println("card initialized.");
 
 
   //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,7 +249,7 @@ void loop() {
 
   //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  
+
   irqCurr = digitalRead(PN532_IRQ);
 
   if (listeningToNFC && irqCurr == LOW && irqPrev == HIGH) {
@@ -275,6 +293,9 @@ void loop() {
   display.println(cardId);
 
   display.display();
+
+  //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  logData();
 }
 
 
@@ -365,7 +386,7 @@ void printCardInfo(uint8_t uid[], uint8_t uidLength) {
   if (uidLength == 4)
   {
     // We probably have a Mifare Classic card ...
-     uint32_t cardid = uid[0];
+    uint32_t cardid = uid[0];
     cardid <<= 8;
     cardid |= uid[1];
     cardid <<= 8;
@@ -395,7 +416,7 @@ void handleNFCDetected() {
   Serial.println(success ? "Read successful" : "Read failed (not a card?)");
 
   if (success) {
-     cardId = getCardId(uid, uidLength);
+    cardId = getCardId(uid, uidLength);
     Serial.print("Found card : ");
     Serial.println(cardId );
   }
@@ -404,5 +425,39 @@ void handleNFCDetected() {
     delay(500);
     //      Serial.println("Start listening for cards again");
     startListeningToNFC();
+  }
+}
+
+
+//datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+void logData() {
+  // make a string for assembling the data to log:
+  String dataString = "";
+
+  // read three sensors and append to the string:
+  dataString += event.orientation.x;
+  dataString += ",";
+  dataString += event.orientation.y;
+  dataString += ",";
+  dataString += event.orientation.z;
+  dataString += ",";
+  dataString += cardId;
+
+
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+
+  // if the file is available, write to it:
+  if (dataFile) {
+    dataFile.println(dataString);
+    dataFile.close();
+    // print to the serial port too:
+    Serial.println(dataString);
+  }
+  // if the file isn't open, pop up an error:
+  else {
+    Serial.println("error opening datalog.txt");
   }
 }
