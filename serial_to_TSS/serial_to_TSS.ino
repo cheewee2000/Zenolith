@@ -12,9 +12,9 @@
 //A3->RX
 //Uart Serial2 (&sercom4, A3, A2, SERCOM_RX_PAD_1, UART_TX_PAD_0);
 Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
-v
 
-oid SERCOM0_0_Handler()
+
+void SERCOM0_0_Handler()
 {
   Serial2.IrqHandler();
 }

@@ -1,24 +1,17 @@
-//display//////////////////////////////////////////////////////////////////
 
 #include <SPI.h>
 #include <Wire.h>
+
+//display/////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
-
 Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
-
-
 #define BUTTON_A  9
 #define BUTTON_B  6
 #define BUTTON_C  5
 
-
-
-//motor//////////////////////////////////////////////////////////////////
-
+//motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://learn.adafruit.com/adafruit-stepper-dc-motor-featherwing/arduino-usage
-//Zenolith Motor Test
-
 #include <Adafruit_MotorShield.h>
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -30,20 +23,29 @@ Adafruit_DCMotor *m3 = AFMS.getMotor(3);
 
 boolean testMotors = false;
 
+//NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//https://github.com/adafruit/Adafruit-PN532
+#include <Adafruit_PN532.h>
+// PIN definitions
+#define PN532_IRQ   (4)
+#define PN532_RESET (5)
 
-//TTS//////////////////////////////////////////////////////////////////
+// Config
+const boolean NFC_DISABLED = false;
+
+// State
+bool listeningToNFC = false;
+uint8_t irqCurr;
+uint8_t irqPrev;
+uint32_t cardId;
+
+// Init the object that controls the PN532 NFC chip
+Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
+
+//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //setup serial2
 #include <Arduino.h>   // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
-
-//m4 pin mapping
-//https://learn.adafruit.com/assets/78438
-
-//set serial https://learn.adafruit.com/using-atsamd21-sercom-to-add-more-spi-i2c-serial-ports/creating-a-new-serial
-//https://forums.adafruit.com/viewtopic.php?f=62&t=154259&p=761240&hilit=samd51+sercom+uart#p761240
-//A2->TX
-//A3->RX
-//Uart Serial2 (&sercom4, A3, A2, SERCOM_RX_PAD_1, UART_TX_PAD_0);
 Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 
 void SERCOM0_0_Handler()
@@ -56,28 +58,31 @@ void SERCOM0_2_Handler()
   Serial2.IrqHandler();
 }
 
-//RTC//////////////////////////////////////////////////////////////////
+//RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include "RTClib.h"
 RTC_DS3231 rtc;
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-
-
-//IMU//////////////////////////////////////////////////////////////////
+//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
-
+unsigned long lastXUpdate;
+#define BNO055_SAMPLERATE_DELAY_MS (100)
+sensors_event_t event;
 
 void setup() {
-  //motor//////////////////////////////////////////////////////////////////
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.println("Hello");
+  delay(50);
+
+
+  //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
   AFMS.begin();  // create with the default frequency 1.6KHz
-  //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
+  delay(50);
 
-
-  //TTS//////////////////////////////////////////////////////////////////
-
+  //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
@@ -93,6 +98,7 @@ void setup() {
     // January 21, 2014 at 3am you would call:
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
+  delay(50);
 
   // When time needs to be re-set on a previously configured device, the
   // following line sets the RTC to the date & time this sketch was compiled
@@ -103,8 +109,8 @@ void setup() {
 
 
 
-  //display//////////////////////////////////////////////////////////////////
-  //Serial.begin(115200);
+  //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
   //Serial.println("128x64 OLED FeatherWing test");
   display.begin(0x3C, true); // Address 0x3C default
@@ -115,14 +121,13 @@ void setup() {
   // Since the buffer is intialized with an Adafruit splashscreen
   // internally, this will display the splashscreen.
   display.display();
-  delay(1000);
+  delay(500);
 
   // Clear the buffer.
   display.clearDisplay();
   display.display();
 
   display.setRotation(1);
-  Serial.println("Button test");
 
   pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
@@ -147,9 +152,6 @@ void setup() {
   display.print(now.month(), DEC);
   display.print('/');
   display.print(now.day(), DEC);
-  //  display.print(" (");
-  //  display.print(daysOfTheWeek[now.dayOfTheWeek()]);
-  //  display.print(") ");
   display.print(" - ");
 
   display.print(now.hour(), DEC);
@@ -161,9 +163,10 @@ void setup() {
 
 
   display.display(); // actually display all of the above
+  delay(50);
 
 
-  //TTS//////////////////////////////////////////////////////////////////
+  //TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
   Serial2.begin(9600);
   pinPeripheral(A5, PIO_SERCOM_ALT);
   pinPeripheral(A4, PIO_SERCOM_ALT);
@@ -175,7 +178,10 @@ void setup() {
   Serial2.write("SHELLO there. I am zenolith. Press Button A. To begin Motor Test\n");
 
 
-  //IMU//////////////////////////////////////////////////////////////////
+
+
+
+  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
   /* Initialise the sensor */
   if (!bno.begin())
   {
@@ -187,36 +193,75 @@ void setup() {
   bno.setExtCrystalUse(true);
 
 
+  //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  if (!NFC_DISABLED) {
+    Serial.println("Initializing NFC chip...");
+    nfc.begin();
+
+    uint32_t versiondata = nfc.getFirmwareVersion();
+    if (! versiondata) {
+      Serial.print("Didn't find PN53x board");
+      while (1); // halt
+    }
+
+    // configure board to read RFID tags
+    nfc.SAMConfig();
+
+    // Setting the NFC IRQ pin.
+    pinMode(PN532_IRQ, INPUT_PULLUP);
+  }
+
+  Serial.println("Started listening to input..");
+
+  startListeningToNFC();
+
+
 }
 
 void loop() {
+  //Serial.println(".");
 
-  //motor//////////////////////////////////////////////////////////////////
+  //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (testMotors) {
     motorTest(m1);
     motorTest(m2);
     motorTest(m3);
   }
 
+  //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  
+  irqCurr = digitalRead(PN532_IRQ);
+
+  if (listeningToNFC && irqCurr == LOW && irqPrev == HIGH) {
+    handleNFCDetected();
+  } else if (irqCurr == LOW && irqPrev == HIGH) {
+    Serial.println("##### Got IRQ while not listening..");
+  }
+
+  irqPrev = irqCurr;
 
 
 
-  //display//////////////////////////////////////////////////////////////////
+  //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
   display.clearDisplay();
   display.setCursor(0, 0);
 
   if (!digitalRead(BUTTON_A)) {
     display.print("Testing Motors");
     Serial2.write("STesting Motors\n");
-    testMotors = true;
-
+    //testMotors = true;
+    delay(100);
   }
-  delay(100);
-  yield();
+  //yield();
 
-  //IMU//////////////////////////////////////////////////////////////////
-  sensors_event_t event;
-  bno.getEvent(&event);
+  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  if ((millis() - lastXUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+    bno.getEvent(&event);
+    lastXUpdate = millis();
+  }
 
   /* Display the floating point data */
   display.print("X: ");
@@ -226,17 +271,17 @@ void loop() {
   display.print("Z: ");
   display.println(event.orientation.z, 4);
 
+  display.print("UUID: ");
+  display.println(cardId);
+
   display.display();
-
-
-
 }
 
 
 
 
 
-//motor//////////////////////////////////////////////////////////////////
+//motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
 void motorTest(Adafruit_DCMotor *m) {
   uint8_t i;
   int d = 20; //lower values here stalls motor
@@ -265,8 +310,99 @@ void motorTest(Adafruit_DCMotor *m) {
 
   m->run(RELEASE);
   delay(1000);
+}
+
+
+//NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void startListeningToNFC() {
+  if (NFC_DISABLED) {
+    return;
+  }
+  listeningToNFC = true;
+  irqCurr = digitalRead(PN532_IRQ);
+  irqPrev = irqCurr;
+
+  Serial.println("START listening to NFC tags..");
+  nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+}
+
+void stopListeningToNFC() {
+  if (NFC_DISABLED) {
+    return;
+  }
+  listeningToNFC = false;
+  Serial.println("STOP listening to NFC tags..");
+  digitalWrite(PN532_RESET, HIGH);
+
+}
+
+
+uint32_t getCardId(uint8_t uid[], uint8_t uidLength) {
+  if (uidLength == 4)
+  {
+    // We probably have a Mifare Classic card ...
+    uint32_t cardid = uid[0];
+    cardid <<= 8;
+    cardid |= uid[1];
+    cardid <<= 8;
+    cardid |= uid[2];
+    cardid <<= 8;
+    cardid |= uid[3];
+    return cardid;
+  } else {
+    return -1;
+  }
+}
+
+void printCardInfo(uint8_t uid[], uint8_t uidLength) {
+  Serial.println("***********************");
+  Serial.println("Found an ISO14443A card !!");
+  Serial.print("  UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
+  Serial.print("  UID Value: ");
+  nfc.PrintHex(uid, uidLength);
+
+  if (uidLength == 4)
+  {
+    // We probably have a Mifare Classic card ...
+     uint32_t cardid = uid[0];
+    cardid <<= 8;
+    cardid |= uid[1];
+    cardid <<= 8;
+    cardid |= uid[2];
+    cardid <<= 8;
+    cardid |= uid[3];
+    Serial.print("Seems to be a Mifare Classic card #");
+    Serial.println(cardid);
+  }
+  Serial.println("");
+  Serial.println("***********************");
+}
 
 
 
+void handleNFCDetected() {
+  Serial.println("**********");
+  Serial.println("Got NFC IRQ");
+  Serial.println("**********");
 
+  uint8_t success = false;
+  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };  // Buffer to store the returned UID
+  uint8_t uidLength;                        // Length of the UID (4 or 7 bytes depending on ISO14443A card type)
+
+  // read the NFC tag's info
+  success = nfc.readDetectedPassiveTargetID(uid, &uidLength);
+  Serial.println(success ? "Read successful" : "Read failed (not a card?)");
+
+  if (success) {
+     cardId = getCardId(uid, uidLength);
+    Serial.print("Found card : ");
+    Serial.println(cardId );
+  }
+
+  if (listeningToNFC) {
+    delay(500);
+    //      Serial.println("Start listening for cards again");
+    startListeningToNFC();
+  }
 }
