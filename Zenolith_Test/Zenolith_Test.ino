@@ -13,7 +13,7 @@ const int chipSelect = 10; //m4
 Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
 #define BUTTON_A  9
 #define BUTTON_B  6
-#define BUTTON_C  5
+//#define BUTTON_C  5
 
 //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://learn.adafruit.com/adafruit-stepper-dc-motor-featherwing/arduino-usage
@@ -191,7 +191,7 @@ void setup() {
   //delay(3000);
   Serial2.write("W180\n");//Wx Set speaking rate (words/minute): x = 75 to 600
   delay(50);
-  Serial2.write("V15\n");//Vx Set audio volume (dB): x = -48 to 18
+  Serial2.write("V10\n");//Vx Set audio volume (dB): x = -48 to 18
   delay(50);
   Serial2.write("SHELLO there. I am zenolith. Press Button A. To begin Motor Test\n");
 
@@ -272,6 +272,14 @@ void loop() {
     //testMotors = true;
     delay(100);
   }
+
+  if (!digitalRead(BUTTON_B)) {
+    display.print("Button B");
+    //Serial2.write("SB\n");
+
+    delay(100);
+  }
+
   //yield();
 
   //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
