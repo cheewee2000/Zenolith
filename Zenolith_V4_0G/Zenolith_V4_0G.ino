@@ -656,6 +656,7 @@ void loop() {
   }
   display.println();
 
+int d=2;
   display.print("P:");
   display.print(Kp, d);
   display.print( " I:" );
