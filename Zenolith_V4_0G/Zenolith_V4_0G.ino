@@ -2,88 +2,6 @@
 #include <SPI.h>
 #include <Wire.h>
 
-//datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <SD.h>
-const int chipSelect = 10; //m4
-
-
-//display/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
-#include <Fonts/Picopixel.h>
-
-Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
-#define BUTTON_A  9
-#define BUTTON_B  6
-//#define BUTTON_C  5
-
-//motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
-//https://learn.adafruit.com/adafruit-stepper-dc-motor-featherwing/arduino-usage
-#include <Adafruit_MotorShield.h>
-// Create the motor shield object with the default I2C address
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-
-// Select which 'port' M1, M2, M3 or M4. In this case, M1
-Adafruit_DCMotor *m1 = AFMS.getMotor(1);
-Adafruit_DCMotor *m2 = AFMS.getMotor(2);
-Adafruit_DCMotor *m3 = AFMS.getMotor(3);
-
-boolean testMotors = false;
-
-//NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-//https://github.com/adafruit/Adafruit-PN532
-#include <Adafruit_PN532.h>
-// PIN definitions
-#define PN532_IRQ   (4)
-#define PN532_RESET (5)
-
-// Config
-const boolean NFC_DISABLED = false;
-
-// State
-bool listeningToNFC = false;
-uint8_t irqCurr;
-uint8_t irqPrev;
-uint32_t cardId;
-
-// Init the object that controls the PN532 NFC chip
-Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
-
-//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
-//setup serial2
-#include <Arduino.h>   // required before wiring_private.h
-#include "wiring_private.h" // pinPeripheral() function
-Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
-
-void SERCOM0_0_Handler()
-{
-  Serial2.IrqHandler();
-}
-//
-void SERCOM0_2_Handler()
-{
-  Serial2.IrqHandler();
-}
-
-//RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "RTClib.h"
-RTC_DS3231 rtc;
-
-//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BNO055.h>
-#include <utility/imumaths.h>
-Adafruit_BNO055 bno = Adafruit_BNO055(55);
-#define BNO055_SAMPLERATE_DELAY_MS (100)
-sensors_event_t event;
-unsigned long lastXUpdate;
-float lastX = 0;
-
-unsigned long lastYUpdate;
-float lastY = 0;
-
-unsigned long lastZUpdate;
-float lastZ = 0;
 // PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://github.com/br3ttb/Arduino-PID-Library
 #include <PID_v1.h>
@@ -104,7 +22,7 @@ double z, zSetpoint, zInput, zOutput;
   (normally zero but a quicker response can be had if you don't mind a couple oscillations of overshoot)
 */
 
-double Kp = 11; //e-10;
+double Kp = 8.5; //e-10;
 double Ki = 0; //e-15;
 double Kd = 0; //e-5;
 
@@ -113,9 +31,342 @@ PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);
 PID zPID(&zInput, &zOutput, &zSetpoint, Kp, Ki, Kd, REVERSE);
 
 
+//motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//https://learn.adafruit.com/adafruit-stepper-dc-motor-featherwing/arduino-usage
+#include <Adafruit_MotorShield.h>
+// Create the motor shield object with the default I2C address
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
+// Select which 'port' M1, M2, M3 or M4. In this case, M1
+Adafruit_DCMotor *m1 = AFMS.getMotor(1);
+Adafruit_DCMotor *m2 = AFMS.getMotor(2);
+Adafruit_DCMotor *m3 = AFMS.getMotor(3);
+
+boolean enableMotors = true;
+
+
+
+//json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <ArduinoJson.h>
+#include <SD.h>
+const int chipSelect = 10; //m4
+
+struct Config {
+  char UUID[64];
+  float xSetpoint;
+  float ySetpoint;
+  float zSetpoint;
+
+};
+const char *filename = "UUID.txt";  // <- SD library uses 8.3 filenames
+Config config;                         // <- global configuration object
+
+
+
+void loadConfiguration(const char *filename, Config &config, String UUID) {
+  // Open file for reading
+  File file = SD.open(filename);
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/v6/assistant to compute the capacity.
+  StaticJsonDocument<5120> doc;
+
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, file);
+  if (error)
+    Serial.println(F("Failed to read file, using default configuration"));
+
+  // Copy values from the JsonDocument to the Config
+  xSetpoint = doc[UUID]["xSetpoint"] | -1;
+  ySetpoint = doc[UUID]["ySetpoint"] | -1;
+  zSetpoint = doc[UUID]["zSetpoint"] | -1;
+
+  enableMotors = doc[UUID]["enableMotors"] | 1;
+
+  //Serial.println(config.xSetpoint );
+
+  // Close the file (Curiously, File's destructor doesn't close the file)
+  file.close();
+}
+
+
+
+
+
+
+//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//setup serial2
+#include <Arduino.h>   // required before wiring_private.h
+#include "wiring_private.h" // pinPeripheral() function
+Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
+
+void SERCOM0_0_Handler()
+{
+  Serial2.IrqHandler();
+}
+//
+void SERCOM0_2_Handler()
+{
+  Serial2.IrqHandler();
+}
+
+
+//NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//https://github.com/adafruit/Adafruit-PN532
+#include <Adafruit_PN532.h>
+// PIN definitions
+#define PN532_IRQ   (4)
+#define PN532_RESET (5)
+
+// Config
+const boolean NFC_DISABLED = false;
+
+// State
+bool listeningToNFC = false;
+uint8_t irqCurr;
+uint8_t irqPrev;
+uint32_t cardId;
+
+Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET); // Init the object that controls the PN532 NFC chip
+
+void startListeningToNFC() {
+  if (NFC_DISABLED) {
+    return;
+  }
+  listeningToNFC = true;
+  irqCurr = digitalRead(PN532_IRQ);
+  irqPrev = irqCurr;
+
+  Serial.println("START listening to NFC tags..");
+  nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+}
+
+void stopListeningToNFC() {
+  if (NFC_DISABLED) {
+    return;
+  }
+  listeningToNFC = false;
+  Serial.println("STOP listening to NFC tags..");
+  digitalWrite(PN532_RESET, HIGH);
+
+}
+
+uint32_t getCardId(uint8_t uid[], uint8_t uidLength) {
+  if (uidLength == 4)
+  {
+    // We probably have a Mifare Classic card ...
+    uint32_t cardid = uid[0];
+    cardid <<= 8;
+    cardid |= uid[1];
+    cardid <<= 8;
+    cardid |= uid[2];
+    cardid <<= 8;
+    cardid |= uid[3];
+    return cardid;
+  } else {
+    return -1;
+  }
+}
+
+void printCardInfo(uint8_t uid[], uint8_t uidLength) {
+  Serial.println("***********************");
+  Serial.println("Found an ISO14443A card !!");
+  Serial.print("  UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
+  Serial.print("  UID Value: ");
+  nfc.PrintHex(uid, uidLength);
+
+  if (uidLength == 4)
+  {
+    // We probably have a Mifare Classic card ...
+    uint32_t cardid = uid[0];
+    cardid <<= 8;
+    cardid |= uid[1];
+    cardid <<= 8;
+    cardid |= uid[2];
+    cardid <<= 8;
+    cardid |= uid[3];
+    Serial.print("Seems to be a Mifare Classic card #");
+    Serial.println(cardid);
+  }
+  Serial.println("");
+  Serial.println("***********************");
+}
+
+void handleNFCDetected() {
+  Serial.println("**********");
+  Serial.println("Got NFC IRQ");
+  Serial.println("**********");
+
+  uint8_t success = false;
+  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };  // Buffer to store the returned UID
+  uint8_t uidLength;                        // Length of the UID (4 or 7 bytes depending on ISO14443A card type)
+
+  // read the NFC tag's info
+  success = nfc.readDetectedPassiveTargetID(uid, &uidLength);
+  Serial.println(success ? "Read successful" : "Read failed (not a card?)");
+
+  if (success) {
+    cardId = getCardId(uid, uidLength);
+    Serial.print("Found card : ");
+    Serial.println(cardId );
+
+    loadConfiguration(filename, config, String(cardId));
+
+    Serial2.write("SBEEP\n");
+  }
+
+  if (listeningToNFC) {
+    delay(500);
+    //Serial.println("Start listening for cards again");
+    startListeningToNFC();
+  }
+}
+
+
+
+//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
+#define BNO055_SAMPLERATE_DELAY_MS (100)
+sensors_event_t event;
+unsigned long lastUpdate;
+float lastX = 0;
+
+//unsigned long lastYUpdate;
+float lastY = 0;
+
+//unsigned long lastZUpdate;
+float lastZ = 0;
+
+float XOffset = 0;
+float YOffset = 0;
+float ZOffset = 0;
+
+
+void updateIMU() {
+  if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+    sensors_event_t event;
+    bno.getEvent(&event);
+    x = event.orientation.x + XOffset;
+    y = event.orientation.y + YOffset;
+    z = event.orientation.z + ZOffset;
+
+    // Get absolute X
+    float diff = x - lastX;
+    if (diff > 180)
+    {
+      XOffset -= 360;
+    }
+    else if (diff < -180)
+    {
+      XOffset += 360;
+    }
+
+    diff = y - lastY;
+    if (diff > 180)
+    {
+      YOffset -= 360;
+    }
+    else if (diff < -180)
+    {
+      YOffset += 360;
+    }
+
+    diff = z - lastZ;
+    if (diff > 180)
+    {
+      ZOffset -= 360;
+    }
+    else if (diff < -180)
+    {
+      ZOffset += 360;
+    }
+
+
+    lastUpdate = millis();
+    x = event.orientation.x + XOffset;
+    y = event.orientation.y + YOffset;
+    z = event.orientation.z + ZOffset;
+
+    lastX = x;
+    lastY = y;
+    lastZ = z;
+
+  }
+}
+
+
+
+
+
+//datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//#include <SD.h>
+//const int chipSelect = 10; //m4
+
+void logData() {
+  // make a string for assembling the data to log:
+  String dataString = "";
+
+  // read three sensors and append to the string:
+  dataString += event.orientation.x;
+  dataString += ",";
+  dataString += event.orientation.y;
+  dataString += ",";
+  dataString += event.orientation.z;
+  dataString += ",";
+  dataString += cardId;
+
+
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+
+  // if the file is available, write to it:
+  if (dataFile) {
+    dataFile.println(dataString);
+    dataFile.close();
+    // print to the serial port too:
+    //Serial.println(dataString);
+  }
+  // if the file isn't open, pop up an error:
+  else {
+    Serial.println("error opening datalog.txt");
+  }
+}
+
+
+//display/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+//#include <Fonts/Picopixel.h>
+//#include <Fonts/Org_01.h>
+//#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/TomThumb.h>
+
+Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
+#define BUTTON_A  9
+#define BUTTON_B  6
+//#define BUTTON_C  5
+
+
+//RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "RTClib.h"
+RTC_DS3231 rtc;
+
+
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SETUP /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
   Serial.begin(115200);
@@ -227,8 +478,8 @@ void setup() {
   //delay(3000);
   Serial2.write("W180\n");//Wx Set speaking rate (words/minute): x = 75 to 600
   delay(50);
-  Serial2.write("V10\n");//Vx Set audio volume (dB): x = -48 to 18
-  //  delay(50);
+  Serial2.write("V15\n");//Vx Set audio volume (dB): x = -48 to 18
+  delay(50);
   Serial2.write("SHELLO there. I am zenolith.\n");
 
 
@@ -284,36 +535,45 @@ void setup() {
 
 }
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////LOOP////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() {
   //Serial.println(".");
 
   //PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  updateX();
+  updateIMU();
   xInput = x;
   xPID.Compute();
 
-  updateY();
+  //updateY();
   yInput = y;
   yPID.Compute();
 
-  updateZ();
+  //updateZ();
   zInput = z;
   zPID.Compute();
 
   //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+  if (enableMotors) {
 
-  if (xOutput < 0)  m1->run(BACKWARD);
-  else  m1->run(FORWARD);
-  m1->setSpeed( abs(xOutput) );
-  delay(20);
-
-
-  if (testMotors) {
-    motorTest(m1);
-    motorTest(m2);
-    motorTest(m3);
+    if (xOutput < 0)  m1->run(BACKWARD);
+    else  m1->run(FORWARD);
+    m1->setSpeed( abs(xOutput) );
+    delay(20);
   }
+
+  else {
+
+    m1->setSpeed(0);
+    delay(20);
+
+
+  }
+
 
   //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -334,13 +594,12 @@ void loop() {
 
   //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  if ((millis() - lastXUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
-    bno.getEvent(&event);
-    lastXUpdate = millis();
-  }
+  // if ((millis() - lastXUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+  //bno.getEvent(&event);
+  // lastXUpdate = millis();
+  // }
 
   //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  const int d = 1;
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println();
@@ -351,28 +610,50 @@ void loop() {
 
   //display.setCursor(0, 6);
   display.setTextSize(1);
-  display.setFont(&Picopixel); //tiny font
+  //display.setFont(&Picopixel); //tiny font
+  //display.setFont(&FreeMono9pt7b); //mono font
+  display.setFont(&TomThumb); //mono font
 
-  display.print("IMU/SET X:");
-  display.print(x, d);
-  display.print( " / " );
-  display.print( xSetpoint, d );
+  display.print("IMU X:");
+  char c[10];
+  sprintf(c, "%+07.2f", x);//add + to positive numbers, leading zeros
+  display.print(c);
   display.print(" Y:");
-  display.print(y, d);
-  display.print( " / " );
-  display.print( ySetpoint, d );
+  sprintf(c, "%+07.2f", y);
+  display.print(c);
   display.print(" Z:");
-  display.print(z, d);
-  display.print( " / " );
-  display.print( xSetpoint, d );
+  sprintf(c, "%+07.2f", z);
+  display.print(c);
   display.println();
 
-  display.print("SPD X:" );
-  display.print( xOutput, d );
-  display.print(" Y:" );
-  display.print( yOutput, d );
-  display.print(" Z:" );
-  display.print( zOutput, d );
+  display.print("SET X:");
+
+  sprintf(c, "%+07.2f", xSetpoint);//add + to positive numbers, leading zeros
+  display.print(c);
+  display.print(" Y:");
+  sprintf(c, "%+07.2f", ySetpoint);
+  display.print(c);
+  display.print(" Z:");
+  sprintf(c, "%+07.2f", xSetpoint);
+  display.print(c);
+  display.println();
+
+  if (enableMotors) {
+
+    display.print("SPD X:" );
+
+    sprintf(c, "%+07.2f", xOutput);//add + to positive numbers, leading zeros
+    display.print(c);
+    display.print(" Y:");
+    sprintf(c, "%+07.2f", yOutput);
+    display.print(c);
+    display.print(" Z:");
+    sprintf(c, "%+07.2f", zOutput);
+    display.print(c);
+
+  } else {
+    display.print("MOTORS DISABLED" );
+  }
   display.println();
 
   display.print("P:");
@@ -390,17 +671,15 @@ void loop() {
 
 
   //serial/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  Serial.print(", X_Set_Point:");
-  Serial.print( xSetpoint );
-  Serial.print(", Current_X:");
-  Serial.print(x);
-  Serial.print(", X_Speed:");
-  Serial.println(xOutput);
+  //  Serial.print(", X_Set_Point:");
+  //  Serial.print( xSetpoint );
+  //  Serial.print(", Current_X:");
+  //  Serial.print(x);
+  //  Serial.print(", X_Speed:");
+  //  Serial.println(xOutput);
 
   //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
   logData();
-
-
 
   //buttons/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (!digitalRead(BUTTON_A)) {
@@ -415,250 +694,5 @@ void loop() {
     xPID.SetTunings( Kp,  Ki,  Kd);
     // Debounce
     delay(100);
-  }
-}
-
-
-
-//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-float XOffset = 0;
-bool updateX() {
-  if ((millis() - lastXUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
-    sensors_event_t event;
-    bno.getEvent(&event);
-    x = event.orientation.x + XOffset;
-
-    // Get absolute X
-    float diff = x - lastX;
-    if (diff > 180)
-    {
-      XOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      XOffset += 360;
-    }
-
-    lastXUpdate = millis();
-    x = event.orientation.x + XOffset;
-
-    lastX = x;
-    return true;
-  }
-}
-
-float YOffset = 0;
-bool updateY() {
-  if ((millis() - lastYUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
-    sensors_event_t event;
-    bno.getEvent(&event);
-    y = event.orientation.y + YOffset;
-
-    // Get absolute X
-    float diff = y - lastY;
-    if (diff > 180)
-    {
-      YOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      YOffset += 360;
-    }
-
-    lastXUpdate = millis();
-    y = event.orientation.y + YOffset;
-
-    lastY = y;
-    return true;
-  }
-}
-
-float ZOffset = 0;
-bool updateZ() {
-  if ((millis() - lastZUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
-    sensors_event_t event;
-    bno.getEvent(&event);
-    z = event.orientation.z + ZOffset;
-
-    // Get absolute X
-    float diff = z - lastZ;
-    if (diff > 180)
-    {
-      ZOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      ZOffset += 360;
-    }
-
-    lastZUpdate = millis();
-    z = event.orientation.z + ZOffset;
-
-    lastZ = z;
-    return true;
-  }
-}
-
-
-
-//motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
-void motorTest(Adafruit_DCMotor *m) {
-  uint8_t i;
-  int d = 20; //lower values here stalls motor
-
-  m->run(FORWARD);
-  for (i = 0; i < 255; i++) {
-    m->setSpeed(i);
-    delay(d);
-  }
-  delay(500);
-  for (i = 255; i != 0; i--) {
-    m->setSpeed(i);
-    delay(d);
-  }
-
-  m->run(BACKWARD);
-  for (i = 0; i < 255; i++) {
-    m->setSpeed(i);
-    delay(d);
-  }
-  delay(500);
-  for (i = 255; i != 0; i--) {
-    m->setSpeed(i);
-    delay(d);
-  }
-
-  m->run(RELEASE);
-  delay(1000);
-}
-
-
-//NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void startListeningToNFC() {
-  if (NFC_DISABLED) {
-    return;
-  }
-  listeningToNFC = true;
-  irqCurr = digitalRead(PN532_IRQ);
-  irqPrev = irqCurr;
-
-  Serial.println("START listening to NFC tags..");
-  nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
-}
-
-void stopListeningToNFC() {
-  if (NFC_DISABLED) {
-    return;
-  }
-  listeningToNFC = false;
-  Serial.println("STOP listening to NFC tags..");
-  digitalWrite(PN532_RESET, HIGH);
-
-}
-
-
-uint32_t getCardId(uint8_t uid[], uint8_t uidLength) {
-  if (uidLength == 4)
-  {
-    // We probably have a Mifare Classic card ...
-    uint32_t cardid = uid[0];
-    cardid <<= 8;
-    cardid |= uid[1];
-    cardid <<= 8;
-    cardid |= uid[2];
-    cardid <<= 8;
-    cardid |= uid[3];
-    return cardid;
-  } else {
-    return -1;
-  }
-}
-
-void printCardInfo(uint8_t uid[], uint8_t uidLength) {
-  Serial.println("***********************");
-  Serial.println("Found an ISO14443A card !!");
-  Serial.print("  UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
-  Serial.print("  UID Value: ");
-  nfc.PrintHex(uid, uidLength);
-
-  if (uidLength == 4)
-  {
-    // We probably have a Mifare Classic card ...
-    uint32_t cardid = uid[0];
-    cardid <<= 8;
-    cardid |= uid[1];
-    cardid <<= 8;
-    cardid |= uid[2];
-    cardid <<= 8;
-    cardid |= uid[3];
-    Serial.print("Seems to be a Mifare Classic card #");
-    Serial.println(cardid);
-  }
-  Serial.println("");
-  Serial.println("***********************");
-}
-
-
-
-void handleNFCDetected() {
-  Serial.println("**********");
-  Serial.println("Got NFC IRQ");
-  Serial.println("**********");
-
-  uint8_t success = false;
-  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };  // Buffer to store the returned UID
-  uint8_t uidLength;                        // Length of the UID (4 or 7 bytes depending on ISO14443A card type)
-
-  // read the NFC tag's info
-  success = nfc.readDetectedPassiveTargetID(uid, &uidLength);
-  Serial.println(success ? "Read successful" : "Read failed (not a card?)");
-
-  if (success) {
-    cardId = getCardId(uid, uidLength);
-    Serial.print("Found card : ");
-    Serial.println(cardId );
-    
-    Serial2.write("SBEEP\n");
- 
-
-  if (listeningToNFC) {
-    delay(500);
-    //Serial.println("Start listening for cards again");
-    startListeningToNFC();
-  }
-}
-
-
-//datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
-void logData() {
-  // make a string for assembling the data to log:
-  String dataString = "";
-
-  // read three sensors and append to the string:
-  dataString += event.orientation.x;
-  dataString += ",";
-  dataString += event.orientation.y;
-  dataString += ",";
-  dataString += event.orientation.z;
-  dataString += ",";
-  dataString += cardId;
-
-
-
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  File dataFile = SD.open("datalog.txt", FILE_WRITE);
-
-  // if the file is available, write to it:
-  if (dataFile) {
-    dataFile.println(dataString);
-    dataFile.close();
-    // print to the serial port too:
-    Serial.println(dataString);
-  }
-  // if the file isn't open, pop up an error:
-  else {
-    Serial.println("error opening datalog.txt");
   }
 }

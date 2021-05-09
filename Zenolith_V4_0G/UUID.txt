@@ -1,14 +1,98 @@
 {
-    "UUID":{
-       "2755378472":{
-          "xSetpoint":"0",
-          "ySetpoint":"0",
-          "zSetpoint":"0"
-       },
-       "486403839":{
-          "P":"11",
-          "I":0,
-          "D":0
-       }
-    }
- }
+
+   "752221695":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
+
+   "2755378472":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":3,
+      "zSetpoint":0
+   },
+
+
+
+   "486403839":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":4,
+      "zSetpoint":0
+   },
+
+
+   "1556543487":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":5,
+      "zSetpoint":6
+   },
+
+
+   "3155489023":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":7,
+      "zSetpoint":0
+   },
+
+   "1279980287":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":8,
+      "zSetpoint":0
+   },
+
+
+   "3436900863":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":9,
+      "zSetpoint":0
+   },
+
+
+   "1013120767":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":10,
+      "zSetpoint":0
+   },
+
+
+   "748944639":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":11,
+      "zSetpoint":0
+   },
+
+   "4004577337":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":12,
+      "zSetpoint":0
+   },
+
+
+   "656429545":{
+      "color":"black",
+      "P":8.5,
+      "I":0,
+      "D":0
+   },
+
+   "1358286421":{
+      "color":"blue",
+      "P":8.5,
+      "I":3,
+      "D":4
+   },
+   "78347042":{
+      "color":"red",
+      "enableMotors":0
+   }
+}

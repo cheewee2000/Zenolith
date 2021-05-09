@@ -1,14 +1,17 @@
 {
-    "UUID":{
-       "2755378472":{
-          "xSetpoint":"0",
-          "ySetpoint":"0",
-          "zSetpoint":"0"
-       },
-       "486403839":{
-          "P":"11",
-          "I":0,
-          "D":0
-       }
-    }
- }
+   "2755378472":{
+      "xSetpoint":10,
+      "ySetpoint":0,
+      "zSetpoint":0
+   },
+   "436403839":{
+      "P":11,
+      "I":0,
+      "D":0
+   },
+   "486403849":{
+      "xSetpoint":10,
+      "ySetpoint":0,
+      "zSetpoint":0
+   }
+}
