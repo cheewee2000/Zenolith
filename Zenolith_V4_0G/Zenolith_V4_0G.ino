@@ -470,14 +470,6 @@ void setup() {
   }
   delay(50);
 
-  // When time needs to be re-set on a previously configured device, the
-  // following line sets the RTC to the date & time this sketch was compiled
-  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  // This line sets the RTC with an explicit date & time, for example to set
-  // January 21, 2014 at 3am you would call:
-  // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-
-
 
   //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -504,7 +496,7 @@ void setup() {
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
-  display.print("I am Zenolith.");
+  display.print("ZENOLITH V4.0");
   display.println();
 
   //  display.write("Press Button A to begin Motor Test");
@@ -517,15 +509,13 @@ void setup() {
   display.print(now.month(), DEC);
   display.print('/');
   display.print(now.day(), DEC);
-  display.print(" - ");
-
+  display.print("  ");
   display.print(now.hour(), DEC);
   display.print(':');
   display.print(now.minute(), DEC);
   display.print(':');
   display.print(now.second(), DEC);
   display.println();
-
 
   display.display(); // actually display all of the above
   delay(50);
@@ -551,7 +541,7 @@ void setup() {
     Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
     while (1);
   }
-  delay(1000);
+  delay(200);
   bno.setExtCrystalUse(true);
   gyroStatus();
 
@@ -606,7 +596,7 @@ void loop() {
   if ( !gyroCalibrated ) {
     if (gyroStatus() == 3 && millis() - lastTalk > 6000) {
       //delay(5000);
-      Serial2.write("SGyro calibrated. Ready.\n");
+      Serial2.write("SReady\n");
       gyroCalibrated = true;
     }
     else if (millis() < 20000 && millis() - lastTalk > 6000) {
