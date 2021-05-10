@@ -1,6 +1,9 @@
 
 #include <SPI.h>
 #include <Wire.h>
+//battery
+#define VBATPIN A6
+float measuredvbat;
 
 // PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://github.com/br3ttb/Arduino-PID-Library
@@ -372,7 +375,7 @@ void logData() {
   dataString += Kd;
   dataString += ",";
 
-  
+
   dataString += id;
   dataString += ",";
   dataString += cardId;
@@ -671,45 +674,45 @@ void loop() {
   //display.setFont(&FreeMono9pt7b); //mono font
   display.setFont(&TomThumb); //mono font
 
-  display.print("IMU X:");
+  display.print("IMU X: ");
   char c[12];
-  sprintf(c, "%+07.2f", x);//add + to positive numbers, leading zeros
+  sprintf(c, "%+07.1f", x);//add + to positive numbers, leading zeros
   display.print(c);
 
-  display.print(" Y:");
-  sprintf(c, "%+07.2f", y);
+  display.print(" Y: ");
+  sprintf(c, "%+07.1f", y);
   display.print(c);
 
-  display.print(" Z:");
-  sprintf(c, "%+07.2f", z);
+  display.print(" Z: ");
+  sprintf(c, "%+07.1f", z);
   display.print(c);
 
   display.println();
 
-  display.print("SET X:");
-  sprintf(c, "%+07.2f", xSetpoint);//add + to positive numbers, leading zeros
+  display.print("SET X: ");
+  sprintf(c, "%+07.1f", xSetpoint);//add + to positive numbers, leading zeros
   display.print(c);
 
-  display.print(" Y:");
-  sprintf(c, "%+07.2f", ySetpoint);
+  display.print(" Y: ");
+  sprintf(c, "%+07.1f", ySetpoint);
   display.print(c);
 
-  display.print(" Z:");
-  sprintf(c, "%+07.2f", zSetpoint);
+  display.print(" Z: ");
+  sprintf(c, "%+07.1f", zSetpoint);
   display.print(c);
 
   display.println();
 
   if (enableMotors) {
 
-    display.print("SPD X:" );
+    display.print("SPD X: " );
 
-    sprintf(c, "%+07.2f", xOutput);//add + to positive numbers, leading zeros
+    sprintf(c, "%+07.1f", xOutput);//add + to positive numbers, leading zeros
     display.print(c);
-    display.print(" Y:");
-    sprintf(c, "%+07.2f", yOutput);
+    display.print(" Y: ");
+    sprintf(c, "%+07.1f", yOutput);
     display.print(c);
-    display.print(" Z:");
+    display.print(" Z: ");
     sprintf(c, "%+07.2f", zOutput);
     display.print(c);
 
@@ -718,21 +721,36 @@ void loop() {
   }
   display.println();
 
-  int d = 3;
-  display.print("P:");
+  int d = 2;
+  display.print("P: ");
   display.print(Kp, d);
-  display.print( " I:" );
+  display.print( " I: " );
   display.print(Ki, d);
-  display.print( " D:" );
+  display.print( " D: " );
   display.print(Kd, d);
 
   display.println();
 
   //gyro
-  display.print( "GYRO:" );
+  display.print( "GYRO: " );
   display.print(gyroStatus());
 
   display.println();
+  
+  //battery
+  if (millis() % 10000 < 100)
+  {
+    measuredvbat = analogRead(VBATPIN);
+    measuredvbat *= 2;    // we divided by 2, so multiply back
+    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+    measuredvbat /= 1024; // convert to voltage
+    measuredvbat = measuredvbat - 3.20; //3.2-4.2
+    measuredvbat = measuredvbat * 100;
+  }
+  display.print("VBat: " );
+  display.print(measuredvbat, 0);
+  display.print("%");
+
 
   display.display();
 
