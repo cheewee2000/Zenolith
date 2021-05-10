@@ -4,6 +4,7 @@
 //battery
 #define VBATPIN A6
 float measuredvbat;
+boolean chargeMode = false;
 
 // PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://github.com/br3ttb/Arduino-PID-Library
@@ -596,6 +597,39 @@ void setup() {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() {
 
+  //chargemode/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  if (chargeMode) {
+
+
+    m1->setSpeed(0);
+    m2->setSpeed(0);
+    m4->setSpeed(0);
+
+    delay(20);
+
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    //battery
+    if (millis() % 1000 < 100)
+    {
+      measuredvbat = analogRead(VBATPIN);
+      measuredvbat *= 2;    // we divided by 2, so multiply back
+      measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+      measuredvbat /= 1024; // convert to voltage
+      measuredvbat = measuredvbat - 3.20; //3.2-4.2
+      measuredvbat = measuredvbat * 100;
+    }
+    display.print("VBat: " );
+    display.print(measuredvbat, 0);
+    display.print("%");
+
+
+    display.display();
+
+
+    return;
+
+  }
   //gyro calibration/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if ( !gyroCalibrated ) {
     if (gyroStatus() == 3 && millis() - lastTalk > 6000) {
