@@ -29,7 +29,7 @@ float Kp = 8.5; //e-10;
 float Ki = 0; //e-15;
 float Kd = 0; //e-5;
 
-PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, REVERSE);
+PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);
 PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);
 PID zPID(&zInput, &zOutput, &zSetpoint, Kp, Ki, Kd, REVERSE);
 
@@ -43,7 +43,7 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Select which 'port' M1, M2, M3 or M4. In this case, M1
 Adafruit_DCMotor *m1 = AFMS.getMotor(1);
 Adafruit_DCMotor *m2 = AFMS.getMotor(2);
-Adafruit_DCMotor *m3 = AFMS.getMotor(3);
+Adafruit_DCMotor *m4 = AFMS.getMotor(4);
 
 boolean enableMotors = true;
 
@@ -630,12 +630,23 @@ void loop() {
     if (xOutput < 0)  m1->run(BACKWARD);
     else  m1->run(FORWARD);
     m1->setSpeed( abs(xOutput) );
+
+    if (yOutput < 0)  m2->run(BACKWARD);
+    else  m2->run(FORWARD);
+    m2->setSpeed( abs(yOutput) );
+
+    if (zOutput < 0)  m4->run(BACKWARD);
+    else  m4->run(FORWARD);
+    m4->setSpeed( abs(zOutput) );
     delay(20);
   }
 
   else {
 
     m1->setSpeed(0);
+    m2->setSpeed(0);
+    m4->setSpeed(0);
+
     delay(20);
 
 
@@ -736,7 +747,7 @@ void loop() {
   display.print(gyroStatus());
 
   display.println();
-  
+
   //battery
   if (millis() % 10000 < 100)
   {
