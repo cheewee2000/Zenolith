@@ -49,7 +49,7 @@ boolean enableMotors = true;
 #include <Arduino.h>   // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
 Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
-
+long lastTalk;
 
 
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,10 +82,11 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
   if (error)
     Serial.println(F("Failed to read file, using default configuration"));
 
-  id = doc[UUID]["id"] | -1;
   xSetpoint = doc[UUID]["xSetpoint"] | xSetpoint;
   ySetpoint = doc[UUID]["ySetpoint"] | ySetpoint;
   zSetpoint = doc[UUID]["zSetpoint"] | zSetpoint;
+
+  id = doc[UUID]["id"] | -1;
 
   Kp = doc[UUID]["P"] | Kp;
   Ki = doc[UUID]["I"] | Ki;
@@ -119,6 +120,7 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
 
 
 
+//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SERCOM0_0_Handler()
 {
@@ -266,6 +268,7 @@ float XOffset = 0;
 float YOffset = 0;
 float ZOffset = 0;
 
+boolean gyroCalibrated = false;
 
 void updateIMU() {
   if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
@@ -320,6 +323,21 @@ void updateIMU() {
 }
 
 
+int gyroStatus(void)
+{
+  /* Get the four calibration values (0..3) */
+  /* Any sensor data reporting 0 should be ignored, */
+  /* 3 means 'fully calibrated" */
+  uint8_t system, gyro, accel, mag;
+  system = gyro = accel = mag = 0;
+  bno.getCalibration(&system, &gyro, &accel, &mag);
+
+  /* Display the individual values */
+  Serial.print(" G:");
+  Serial.println(gyro, DEC);
+  return gyro;
+}
+
 
 
 
@@ -338,8 +356,28 @@ void logData() {
   dataString += ",";
   dataString += event.orientation.z;
   dataString += ",";
-  dataString += cardId;
 
+  dataString += xSetpoint;
+  dataString += ",";
+  dataString += ySetpoint;
+  dataString += ",";
+  dataString += zSetpoint;
+  dataString += ",";
+
+
+  dataString += Kp;
+  dataString += ",";
+  dataString += Ki;
+  dataString += ",";
+  dataString += Kd;
+  dataString += ",";
+
+  
+  dataString += id;
+  dataString += ",";
+  dataString += cardId;
+  dataString += ",";
+  dataString += gyroStatus();
 
 
   // open the file. note that only one file can be open at a time,
@@ -502,7 +540,7 @@ void setup() {
   delay(50);
   Serial2.write("V15\n");//Vx Set audio volume (dB): x = -48 to 18
   delay(50);
-  Serial2.write("SHELLO there. I am zenolith.\n");
+  //Serial2.write("SI am zenolith.\n");
 
 
   //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -515,7 +553,7 @@ void setup() {
   }
   delay(1000);
   bno.setExtCrystalUse(true);
-
+  gyroStatus();
 
   //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -563,6 +601,20 @@ void setup() {
 /////LOOP////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop() {
+
+  //gyro calibration/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  if ( !gyroCalibrated ) {
+    if (gyroStatus() == 3 && millis() - lastTalk > 6000) {
+      //delay(5000);
+      Serial2.write("SGyro calibrated. Ready.\n");
+      gyroCalibrated = true;
+    }
+    else if (millis() < 20000 && millis() - lastTalk > 6000) {
+      Serial2.write("SCalibrating gyro. Stand still.\n");
+      lastTalk = millis();
+    }
+  }
+
   //Serial.println(".");
 
   //PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -611,16 +663,6 @@ void loop() {
   irqPrev = irqCurr;
 
 
-
-
-
-  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  // if ((millis() - lastXUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
-  //bno.getEvent(&event);
-  // lastXUpdate = millis();
-  // }
-
   //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
   display.clearDisplay();
   display.setCursor(0, 0);
@@ -640,27 +682,32 @@ void loop() {
   display.setFont(&TomThumb); //mono font
 
   display.print("IMU X:");
-  char c[10];
+  char c[12];
   sprintf(c, "%+07.2f", x);//add + to positive numbers, leading zeros
   display.print(c);
+
   display.print(" Y:");
   sprintf(c, "%+07.2f", y);
   display.print(c);
+
   display.print(" Z:");
   sprintf(c, "%+07.2f", z);
   display.print(c);
+
   display.println();
 
   display.print("SET X:");
-
   sprintf(c, "%+07.2f", xSetpoint);//add + to positive numbers, leading zeros
   display.print(c);
+
   display.print(" Y:");
   sprintf(c, "%+07.2f", ySetpoint);
   display.print(c);
+
   display.print(" Z:");
-  sprintf(c, "%+07.2f", xSetpoint);
+  sprintf(c, "%+07.2f", zSetpoint);
   display.print(c);
+
   display.println();
 
   if (enableMotors) {
@@ -688,6 +735,12 @@ void loop() {
   display.print(Ki, d);
   display.print( " D:" );
   display.print(Kd, d);
+
+  display.println();
+
+  //gyro
+  display.print( "GYRO:" );
+  display.print(gyroStatus());
 
   display.println();
 
