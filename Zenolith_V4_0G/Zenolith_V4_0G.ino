@@ -22,9 +22,9 @@ double z, zSetpoint, zInput, zOutput;
   (normally zero but a quicker response can be had if you don't mind a couple oscillations of overshoot)
 */
 
-double Kp = 8.5; //e-10;
-double Ki = 0; //e-15;
-double Kd = 0; //e-5;
+float Kp = 8.5; //e-10;
+float Ki = 0; //e-15;
+float Kd = 0; //e-5;
 
 PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, REVERSE);
 PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);
@@ -44,12 +44,19 @@ Adafruit_DCMotor *m3 = AFMS.getMotor(3);
 
 boolean enableMotors = true;
 
+//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//setup serial2
+#include <Arduino.h>   // required before wiring_private.h
+#include "wiring_private.h" // pinPeripheral() function
+Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
+
 
 
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <ArduinoJson.h>
 #include <SD.h>
 const int chipSelect = 10; //m4
+int id = 0;
 
 struct Config {
   char UUID[64];
@@ -62,24 +69,45 @@ const char *filename = "UUID.txt";  // <- SD library uses 8.3 filenames
 Config config;                         // <- global configuration object
 
 
-
 void loadConfiguration(const char *filename, Config &config, String UUID) {
   // Open file for reading
   File file = SD.open(filename);
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<5120> doc;
+  StaticJsonDocument<10240> doc;
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error)
     Serial.println(F("Failed to read file, using default configuration"));
 
-  // Copy values from the JsonDocument to the Config
-  xSetpoint = doc[UUID]["xSetpoint"] | -1;
-  ySetpoint = doc[UUID]["ySetpoint"] | -1;
-  zSetpoint = doc[UUID]["zSetpoint"] | -1;
+  id = doc[UUID]["id"] | -1;
+  xSetpoint = doc[UUID]["xSetpoint"] | xSetpoint;
+  ySetpoint = doc[UUID]["ySetpoint"] | ySetpoint;
+  zSetpoint = doc[UUID]["zSetpoint"] | zSetpoint;
+
+  Kp = doc[UUID]["P"] | Kp;
+  Ki = doc[UUID]["I"] | Ki;
+  Kd = doc[UUID]["D"] | Kd;
+  xPID.SetTunings( Kp,  Ki,  Kd);
+  yPID.SetTunings( Kp,  Ki,  Kd);
+  zPID.SetTunings( Kp,  Ki,  Kd);
+
+
+  const char *say = doc[UUID]["say"] | "error";
+
+  if (id >= 0) {
+    char c[10];
+    sprintf(c, "S%d", id);
+    Serial2.write(c); //say ID
+    Serial2.write("\n");
+  } else {
+    Serial2.write("S");
+    Serial2.write(say); //say
+    Serial2.write("\n");
+
+  }
 
   enableMotors = doc[UUID]["enableMotors"] | 1;
 
@@ -92,14 +120,6 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
 
 
 
-
-
-//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
-//setup serial2
-#include <Arduino.h>   // required before wiring_private.h
-#include "wiring_private.h" // pinPeripheral() function
-Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
-
 void SERCOM0_0_Handler()
 {
   Serial2.IrqHandler();
@@ -109,6 +129,8 @@ void SERCOM0_2_Handler()
 {
   Serial2.IrqHandler();
 }
+
+
 
 
 //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -212,11 +234,11 @@ void handleNFCDetected() {
 
     loadConfiguration(filename, config, String(cardId));
 
-    Serial2.write("SBEEP\n");
+    //Serial2.write("SBEEP\n");
   }
 
   if (listeningToNFC) {
-    delay(500);
+    delay(1000);
     //Serial.println("Start listening for cards again");
     startListeningToNFC();
   }
@@ -605,7 +627,10 @@ void loop() {
   display.println();
 
   display.setFont(); //normal font
-  display.print("UUID: ");
+  display.print("ID: ");
+  display.print(id);
+  display.print(":");
+
   display.println(cardId);
 
   //display.setCursor(0, 6);
@@ -656,7 +681,7 @@ void loop() {
   }
   display.println();
 
-int d=2;
+  int d = 3;
   display.print("P:");
   display.print(Kp, d);
   display.print( " I:" );
@@ -665,8 +690,6 @@ int d=2;
   display.print(Kd, d);
 
   display.println();
-
-
 
   display.display();
 

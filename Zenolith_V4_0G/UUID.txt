@@ -1,98 +1,128 @@
 {
-
-   "752221695":{
+   "4004577337":{
+      "id":1,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":2,
       "zSetpoint":0
    },
-
+   "1279980287":{
+      "id":2,
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
+   "3155489023":{
+      "id":3,
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
+   "1556543487":{
+      "id":4,
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
+   "486403839":{
+      "id":5,
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
+   "752221695":{
+      "id":6,
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
    "2755378472":{
+      "id":7,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":3,
       "zSetpoint":0
    },
-
-
-
-   "486403839":{
+   "748944639":{
+      "id":8,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":4,
       "zSetpoint":0
    },
-
-
-   "1556543487":{
+   "1013120767":{
+      "id":9,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":5,
       "zSetpoint":6
    },
-
-
-   "3155489023":{
+   "3436900863":{
+      "id":10,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":7,
       "zSetpoint":0
    },
-
-   "1279980287":{
+   "2352283647":{
+      "id":11,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":8,
       "zSetpoint":0
    },
-
-
-   "3436900863":{
+   "2673941824":{
+      "id":12,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":9,
       "zSetpoint":0
    },
-
-
-   "1013120767":{
+   "4294967295":{
+      "id":13,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":10,
       "zSetpoint":0
    },
-
-
-   "748944639":{
+   "3319668032":{
+      "id":14,
       "color":"white",
       "xSetpoint":10,
       "ySetpoint":11,
       "zSetpoint":0
    },
-
-   "4004577337":{
-      "color":"white",
-      "xSetpoint":10,
-      "ySetpoint":12,
-      "zSetpoint":0
-   },
-
-
    "656429545":{
       "color":"black",
       "P":8.5,
-      "I":0,
-      "D":0
+      "I":0.1,
+      "D":0.1
    },
-
    "1358286421":{
-      "color":"blue",
-      "P":8.5,
-      "I":3,
-      "D":4
+      "say":"hahahaha",
+      "color":"blue"
    },
    "78347042":{
+      "say":"stop",
       "color":"red",
       "enableMotors":0
+   },
+   "2426917973":{
+      "say":"go",
+      "color":"blue",
+      "enableMotors":1
+   },
+   "1462373631":{
+      "say":"reset",
+      "color":"black",
+      "reset":1,
+      "P":8.5,
+      "I":0.1,
+      "D":0.1
    }
 }
