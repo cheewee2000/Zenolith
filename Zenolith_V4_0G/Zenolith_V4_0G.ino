@@ -274,7 +274,8 @@ float ZOffset = 0;
 boolean gyroCalibrated = false;
 
 void updateIMU() {
-  if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+  //if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS)
+  {
     sensors_event_t event;
     bno.getEvent(&event);
     x = event.orientation.x + XOffset;
@@ -313,7 +314,7 @@ void updateIMU() {
     }
 
 
-    lastUpdate = millis();
+    //   lastUpdate = millis();
     x = event.orientation.x + XOffset;
     y = event.orientation.y + YOffset;
     z = event.orientation.z + ZOffset;
@@ -611,18 +612,23 @@ void loop() {
   //Serial.println(".");
 
   //PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  updateIMU();
-  xInput = x;
-  xPID.Compute();
 
   //updateY();
-  yInput = y;
-  yPID.Compute();
-
   //updateZ();
-  zInput = z;
-  zPID.Compute();
 
+
+  if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+    //update IMU and PID together
+    updateIMU();
+    xInput = x;
+    xPID.Compute();
+    yInput = y;
+    yPID.Compute();
+    zInput = z;
+    zPID.Compute();
+    lastUpdate = millis();
+
+  }
   //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   if (enableMotors) {
@@ -648,7 +654,6 @@ void loop() {
     m4->setSpeed(0);
 
     delay(20);
-
 
   }
 
