@@ -271,7 +271,7 @@ void handleNFCDetected() {
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
-#define BNO055_SAMPLERATE_DELAY_MS (100)
+#define BNO055_SAMPLERATE_DELAY_MS (10) //10-1000
 sensors_event_t event;
 unsigned long lastUpdate;
 float lastX = 0;
@@ -419,6 +419,16 @@ void logData() {
   dataString += cardId;
   dataString += ",";
   dataString += gyroStatus();
+
+
+  imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+
+  dataString += ",";
+  dataString += accel.x;
+  dataString += ",";
+  dataString += accel.y;
+  dataString += ",";
+  dataString += accel.z;
 
 
   // open the file. note that only one file can be open at a time,
@@ -859,6 +869,11 @@ void loop() {
     xPID.SetTunings( Kp,  Ki,  Kd);
     // Debounce
     delay(100);
+
+    m1->setSpeed(0);
+    m2->setSpeed(0);
+    m4->setSpeed(0);
+    delay(1000);
   }
 
   if (!digitalRead(BUTTON_B)) {
@@ -867,6 +882,8 @@ void loop() {
     chargeMode = !chargeMode;
     // Debounce
     delay(100);
+
+
   }
 
 }
