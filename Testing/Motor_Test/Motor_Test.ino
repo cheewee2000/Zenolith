@@ -10,7 +10,7 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Select which 'port' M1, M2, M3 or M4. In this case, M1
 Adafruit_DCMotor *m1 = AFMS.getMotor(1);
 Adafruit_DCMotor *m2 = AFMS.getMotor(2);
-Adafruit_DCMotor *m3 = AFMS.getMotor(3);
+Adafruit_DCMotor *m4 = AFMS.getMotor(4);
 
 
 void setup() {
@@ -22,7 +22,7 @@ void setup() {
 void loop() {
   motorTest(m1);
   motorTest(m2);
-  motorTest(m3);
+  motorTest(m4);
 }
 
 
@@ -31,23 +31,23 @@ void motorTest(Adafruit_DCMotor *m) {
   int d = 20; //lower values here stalls motor
 
   m->run(FORWARD);
-  for (i = 0; i < 255; i++) {
+  for (i = 0; i < 255; i+=5) {
     m->setSpeed(i);
     delay(d);
   }
   delay(500);
-  for (i = 255; i != 0; i--) {
+  for (i = 255; i != 0; i-=5) {
     m->setSpeed(i);
     delay(d);
   }
 
   m->run(BACKWARD);
-  for (i = 0; i < 255; i++) {
+  for (i = 0; i < 255; i+=5) {
     m->setSpeed(i);
     delay(d);
   }
   delay(500);
-  for (i = 255; i != 0; i--) {
+  for (i = 255; i != 0; i-=5) {
     m->setSpeed(i);
     delay(d);
   }

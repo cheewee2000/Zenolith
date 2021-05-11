@@ -26,9 +26,9 @@ double z, zSetpoint, zInput, zOutput;
   (normally zero but a quicker response can be had if you don't mind a couple oscillations of overshoot)
 */
 
-float Kp = 8.5; //e-10;
-float Ki = 0; //e-15;
-float Kd = 0; //e-5;
+float Kp = 8.1;
+float Ki = 1;
+float Kd = 0.25;
 
 PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);
 PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);
@@ -79,31 +79,19 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<10240> doc;
+  StaticJsonDocument<20240> doc;
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error)
     Serial.println(F("Failed to read file, using default configuration"));
 
-  xSetpoint = doc[UUID]["xSetpoint"] | xSetpoint;
-  ySetpoint = doc[UUID]["ySetpoint"] | ySetpoint;
-  zSetpoint = doc[UUID]["zSetpoint"] | zSetpoint;
-
   id = doc[UUID]["id"] | -1;
-
-  Kp = doc[UUID]["P"] | Kp;
-  Ki = doc[UUID]["I"] | Ki;
-  Kd = doc[UUID]["D"] | Kd;
-  xPID.SetTunings( Kp,  Ki,  Kd);
-  yPID.SetTunings( Kp,  Ki,  Kd);
-  zPID.SetTunings( Kp,  Ki,  Kd);
-
 
   const char *say = doc[UUID]["say"] | "error";
 
   if (id >= 0) {
-    char c[10];
+    char c[20];
     sprintf(c, "S%d", id);
     Serial2.write(c); //say ID
     Serial2.write("\n");
@@ -111,8 +99,34 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
     Serial2.write("S");
     Serial2.write(say); //say
     Serial2.write("\n");
-
   }
+
+
+  xSetpoint = doc[UUID]["xSetpoint"] | xSetpoint;
+  ySetpoint = doc[UUID]["ySetpoint"] | ySetpoint;
+  zSetpoint = doc[UUID]["zSetpoint"] | zSetpoint;
+
+
+  Kp = doc[UUID]["P"] | Kp;
+  Ki = doc[UUID]["I"] | Ki;
+  Kd = doc[UUID]["D"] | Kd;
+
+
+
+  float pd = doc[UUID]["Pdelta"] | 0.0;
+  float id = doc[UUID]["Idelta"] | 0.0;
+  float dd = doc[UUID]["Ddelta"] | 0.0;
+
+  //Serial.println(pd);
+
+  Kp = Kp + pd;
+  Ki = Ki + id;
+  Kd = Kd + dd;
+
+  xPID.SetTunings( Kp,  Ki,  Kd);
+  yPID.SetTunings( Kp,  Ki,  Kd);
+  zPID.SetTunings( Kp,  Ki,  Kd);
+
 
   enableMotors = doc[UUID]["enableMotors"] | 1;
 
@@ -277,11 +291,29 @@ boolean gyroCalibrated = false;
 void updateIMU() {
   //if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS)
   {
-    sensors_event_t event;
-    bno.getEvent(&event);
-    x = event.orientation.x + XOffset;
-    y = event.orientation.y + YOffset;
-    z = event.orientation.z + ZOffset;
+
+
+    imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+
+    /* Display the floating point data */
+    //    Serial.print("X: ");
+    //    Serial.print(euler.x());
+    //    Serial.print(" Y: ");
+    //    Serial.print(euler.y());
+    //    Serial.print(" Z: ");
+    //    Serial.print(euler.z());
+    //    Serial.println("");
+
+    x = euler.x() + XOffset;
+    y = euler.y() + YOffset;
+    z = euler.z() + ZOffset;
+
+    //sensors_event_t event;
+    //bno.getEvent(&event);
+    //    x = event.orientation.x + XOffset;
+    //    y = event.orientation.y + YOffset;
+    //    z = event.orientation.z + ZOffset;
+
 
     // Get absolute X
     float diff = x - lastX;
@@ -316,9 +348,13 @@ void updateIMU() {
 
 
     //   lastUpdate = millis();
-    x = event.orientation.x + XOffset;
-    y = event.orientation.y + YOffset;
-    z = event.orientation.z + ZOffset;
+    //    x = event.orientation.x + XOffset;
+    //    y = event.orientation.y + YOffset;
+    //    z = event.orientation.z + ZOffset;
+
+    x = euler.x() + XOffset;
+    y = euler.y() + YOffset;
+    z = euler.z() + ZOffset;
 
     lastX = x;
     lastY = y;
@@ -338,8 +374,8 @@ int gyroStatus(void)
   bno.getCalibration(&system, &gyro, &accel, &mag);
 
   /* Display the individual values */
-  Serial.print(" G:");
-  Serial.println(gyro, DEC);
+  //  Serial.print(" G:");
+  //  Serial.println(gyro, DEC);
   return gyro;
 }
 
@@ -599,18 +635,196 @@ void loop() {
 
   //chargemode/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (chargeMode) {
-
-
     m1->setSpeed(0);
     m2->setSpeed(0);
     m4->setSpeed(0);
+    //
+    //    delay(20);
 
-    delay(20);
-
-    display.clearDisplay();
-    display.setCursor(0, 0);
     //battery
     if (millis() % 1000 < 100)
+    {
+      measuredvbat = analogRead(VBATPIN);
+      measuredvbat *= 2;    // we divided by 2, so multiply back
+      measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+      measuredvbat /= 1024; // convert to voltage
+      measuredvbat = measuredvbat - 3.20; //3.2-4.2
+      measuredvbat = measuredvbat * 100;
+    }
+
+    display.setFont(); //normal font
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.print("VBat: " );
+    display.print(measuredvbat, 0);
+    display.print("%");
+
+
+    display.display();
+
+
+
+  } else {
+
+
+    //gyro calibration/////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if ( !gyroCalibrated ) {
+      if (gyroStatus() == 3 && millis() - lastTalk > 6000) {
+        //delay(5000);
+        Serial2.write("SReady\n");
+        gyroCalibrated = true;
+      }
+      else if (millis() < 20000 && millis() - lastTalk > 6000) {
+        Serial2.write("SCalibrating gyro. Stand still.\n");
+        lastTalk = millis();
+      }
+    }
+
+    //Serial.println(".");
+
+    //PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //updateY();
+    //updateZ();
+
+
+    if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+      //update IMU and PID together
+      updateIMU();
+      xInput = x;
+      xPID.Compute();
+      yInput = y;
+      yPID.Compute();
+      zInput = z;
+      zPID.Compute();
+      lastUpdate = millis();
+
+      //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+      if (enableMotors) {
+
+        if (xOutput < 0)  m1->run(BACKWARD);
+        else  m1->run(FORWARD);
+        m1->setSpeed( abs(xOutput) );
+        //
+        //        if (yOutput < 0)  m2->run(BACKWARD);
+        //        else  m2->run(FORWARD);
+        //        m2->setSpeed( abs(yOutput) );
+        //
+        //                if (zOutput < 0)  m4->run(BACKWARD);
+        //                else  m4->run(FORWARD);
+        //                m4->setSpeed( abs(zOutput) );
+        // delay(20);
+      }
+
+      else {
+
+        m1->setSpeed(0);
+        m2->setSpeed(0);
+        m4->setSpeed(0);
+
+        delay(20);
+
+      }
+    }
+
+    //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    irqCurr = digitalRead(PN532_IRQ);
+
+    if (listeningToNFC && irqCurr == LOW && irqPrev == HIGH) {
+      handleNFCDetected();
+    } else if (irqCurr == LOW && irqPrev == HIGH) {
+      Serial.println("##### Got IRQ while not listening..");
+    }
+
+    irqPrev = irqCurr;
+
+
+    //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println();
+
+    display.setFont(); //normal font
+    display.print("ID: ");
+    display.print(id);
+    display.print(":");
+
+    display.println(cardId);
+
+    //display.setCursor(0, 6);
+    display.setTextSize(1);
+    //display.setFont(&Picopixel); //tiny font
+    //display.setFont(&FreeMono9pt7b); //mono font
+    display.setFont(&TomThumb); //mono font
+
+    display.print("IMU X: ");
+    char c[12];
+    sprintf(c, "%+07.1f", x);//add + to positive numbers, leading zeros
+    display.print(c);
+
+    display.print(" Y: ");
+    sprintf(c, "%+07.1f", y);
+    display.print(c);
+
+    display.print(" Z: ");
+    sprintf(c, "%+07.1f", z);
+    display.print(c);
+
+    display.println();
+
+    display.print("SET X: ");
+    sprintf(c, "%+07.1f", xSetpoint);//add + to positive numbers, leading zeros
+    display.print(c);
+
+    display.print(" Y: ");
+    sprintf(c, "%+07.1f", ySetpoint);
+    display.print(c);
+
+    display.print(" Z: ");
+    sprintf(c, "%+07.1f", zSetpoint);
+    display.print(c);
+
+    display.println();
+
+    if (enableMotors) {
+
+      display.print("SPD X: " );
+
+      sprintf(c, "%+07.1f", xOutput);//add + to positive numbers, leading zeros
+      display.print(c);
+      display.print(" Y: ");
+      sprintf(c, "%+07.1f", yOutput);
+      display.print(c);
+      display.print(" Z: ");
+      sprintf(c, "%+07.2f", zOutput);
+      display.print(c);
+
+    } else {
+      display.print("MOTORS DISABLED" );
+    }
+    display.println();
+
+    int d = 2;
+    display.print("P: ");
+    display.print(Kp, d);
+    display.print( " I: " );
+    display.print(Ki, d);
+    display.print( " D: " );
+    display.print(Kd, d);
+
+    display.println();
+
+    //gyro
+    display.print( "GYRO: " );
+    display.print(gyroStatus());
+
+    display.println();
+
+    //battery
+    if (millis() % 10000 < 100)
     {
       measuredvbat = analogRead(VBATPIN);
       measuredvbat *= 2;    // we divided by 2, so multiply back
@@ -627,195 +841,18 @@ void loop() {
     display.display();
 
 
-    return;
+    //serial/////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //  Serial.print(", X_Set_Point:");
+    //  Serial.print( xSetpoint );
+    //  Serial.print(", Current_X:");
+    //  Serial.print(x);
+    //  Serial.print(", X_Speed:");
+    //  Serial.println(xOutput);
+
+    //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+    logData();
 
   }
-  //gyro calibration/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  if ( !gyroCalibrated ) {
-    if (gyroStatus() == 3 && millis() - lastTalk > 6000) {
-      //delay(5000);
-      Serial2.write("SReady\n");
-      gyroCalibrated = true;
-    }
-    else if (millis() < 20000 && millis() - lastTalk > 6000) {
-      Serial2.write("SCalibrating gyro. Stand still.\n");
-      lastTalk = millis();
-    }
-  }
-
-  //Serial.println(".");
-
-  //PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  //updateY();
-  //updateZ();
-
-
-  if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
-    //update IMU and PID together
-    updateIMU();
-    xInput = x;
-    xPID.Compute();
-    yInput = y;
-    yPID.Compute();
-    zInput = z;
-    zPID.Compute();
-    lastUpdate = millis();
-
-  }
-  //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  if (enableMotors) {
-
-    if (xOutput < 0)  m1->run(BACKWARD);
-    else  m1->run(FORWARD);
-    m1->setSpeed( abs(xOutput) );
-
-    if (yOutput < 0)  m2->run(BACKWARD);
-    else  m2->run(FORWARD);
-    m2->setSpeed( abs(yOutput) );
-
-    if (zOutput < 0)  m4->run(BACKWARD);
-    else  m4->run(FORWARD);
-    m4->setSpeed( abs(zOutput) );
-    delay(20);
-  }
-
-  else {
-
-    m1->setSpeed(0);
-    m2->setSpeed(0);
-    m4->setSpeed(0);
-
-    delay(20);
-
-  }
-
-
-  //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-  irqCurr = digitalRead(PN532_IRQ);
-
-  if (listeningToNFC && irqCurr == LOW && irqPrev == HIGH) {
-    handleNFCDetected();
-  } else if (irqCurr == LOW && irqPrev == HIGH) {
-    Serial.println("##### Got IRQ while not listening..");
-  }
-
-  irqPrev = irqCurr;
-
-
-  //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println();
-
-  display.setFont(); //normal font
-  display.print("ID: ");
-  display.print(id);
-  display.print(":");
-
-  display.println(cardId);
-
-  //display.setCursor(0, 6);
-  display.setTextSize(1);
-  //display.setFont(&Picopixel); //tiny font
-  //display.setFont(&FreeMono9pt7b); //mono font
-  display.setFont(&TomThumb); //mono font
-
-  display.print("IMU X: ");
-  char c[12];
-  sprintf(c, "%+07.1f", x);//add + to positive numbers, leading zeros
-  display.print(c);
-
-  display.print(" Y: ");
-  sprintf(c, "%+07.1f", y);
-  display.print(c);
-
-  display.print(" Z: ");
-  sprintf(c, "%+07.1f", z);
-  display.print(c);
-
-  display.println();
-
-  display.print("SET X: ");
-  sprintf(c, "%+07.1f", xSetpoint);//add + to positive numbers, leading zeros
-  display.print(c);
-
-  display.print(" Y: ");
-  sprintf(c, "%+07.1f", ySetpoint);
-  display.print(c);
-
-  display.print(" Z: ");
-  sprintf(c, "%+07.1f", zSetpoint);
-  display.print(c);
-
-  display.println();
-
-  if (enableMotors) {
-
-    display.print("SPD X: " );
-
-    sprintf(c, "%+07.1f", xOutput);//add + to positive numbers, leading zeros
-    display.print(c);
-    display.print(" Y: ");
-    sprintf(c, "%+07.1f", yOutput);
-    display.print(c);
-    display.print(" Z: ");
-    sprintf(c, "%+07.2f", zOutput);
-    display.print(c);
-
-  } else {
-    display.print("MOTORS DISABLED" );
-  }
-  display.println();
-
-  int d = 2;
-  display.print("P: ");
-  display.print(Kp, d);
-  display.print( " I: " );
-  display.print(Ki, d);
-  display.print( " D: " );
-  display.print(Kd, d);
-
-  display.println();
-
-  //gyro
-  display.print( "GYRO: " );
-  display.print(gyroStatus());
-
-  display.println();
-
-  //battery
-  if (millis() % 10000 < 100)
-  {
-    measuredvbat = analogRead(VBATPIN);
-    measuredvbat *= 2;    // we divided by 2, so multiply back
-    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-    measuredvbat /= 1024; // convert to voltage
-    measuredvbat = measuredvbat - 3.20; //3.2-4.2
-    measuredvbat = measuredvbat * 100;
-  }
-  display.print("VBat: " );
-  display.print(measuredvbat, 0);
-  display.print("%");
-
-
-  display.display();
-
-
-  //serial/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  //  Serial.print(", X_Set_Point:");
-  //  Serial.print( xSetpoint );
-  //  Serial.print(", Current_X:");
-  //  Serial.print(x);
-  //  Serial.print(", X_Speed:");
-  //  Serial.println(xOutput);
-
-  //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  logData();
-
   //buttons/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (!digitalRead(BUTTON_A)) {
     Kp += 0.1;
@@ -825,9 +862,11 @@ void loop() {
   }
 
   if (!digitalRead(BUTTON_B)) {
-    Kp -= 0.1;
-    xPID.SetTunings( Kp,  Ki,  Kd);
+    //    Kp -= 0.1;
+    //    xPID.SetTunings( Kp,  Ki,  Kd);
+    chargeMode = !chargeMode;
     // Debounce
     delay(100);
   }
+
 }
