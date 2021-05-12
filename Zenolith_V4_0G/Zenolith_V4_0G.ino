@@ -15,6 +15,8 @@ double x, xSetpoint, xInput, xOutput;
 double y, ySetpoint, yInput, yOutput;
 double z, zSetpoint, zInput, zOutput;
 
+
+
 //Specify the links and initial tuning parameters
 /*
   1.Set all gains to zero.
@@ -26,9 +28,34 @@ double z, zSetpoint, zInput, zOutput;
   (normally zero but a quicker response can be had if you don't mind a couple oscillations of overshoot)
 */
 
-float Kp = 8.1;
-float Ki = 1;
-float Kd = 0.25;
+//float Kp = 5.6;
+//float Ki = 0.0;
+//float Kd = 0.26;
+//
+//float Kp = 5.5;
+//float Ki = 0.0;
+//float Kd = 0.3;
+
+
+//float Kp = 8.1;
+//float Ki = .31;
+//float Kd = 1.2;
+
+//float Kp = 9.0;
+//float Ki = .7;
+//float Kd = 2.7;
+
+
+//single axis
+//float Kp = 14.90;
+//float Ki = 0.2;
+//float Kd = 4.3;
+
+//all axis + 4/6 shells
+float Kp = 15.70;
+float Ki = 0.2;
+float Kd = 4.9;
+
 
 PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);
 PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);
@@ -391,11 +418,25 @@ void logData() {
   String dataString = "";
 
   // read three sensors and append to the string:
-  dataString += event.orientation.x;
+  //  dataString += event.orientation.x;
+  //  dataString += ",";
+  //  dataString += event.orientation.y;
+  //  dataString += ",";
+  //  dataString += event.orientation.z;
+  //  dataString += ",";
+
+  dataString += id;
   dataString += ",";
-  dataString += event.orientation.y;
+  dataString += cardId;
   dataString += ",";
-  dataString += event.orientation.z;
+  dataString += gyroStatus();
+  dataString += ",";
+
+  dataString += x;
+  dataString += ",";
+  dataString += y;
+  dataString += ",";
+  dataString +=  z;
   dataString += ",";
 
   dataString += xSetpoint;
@@ -411,24 +452,19 @@ void logData() {
   dataString += Ki;
   dataString += ",";
   dataString += Kd;
-  dataString += ",";
 
 
-  dataString += id;
-  dataString += ",";
-  dataString += cardId;
-  dataString += ",";
-  dataString += gyroStatus();
+
 
 
   imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
 
   dataString += ",";
-  dataString += accel.x;
+  dataString += accel.x();
   dataString += ",";
-  dataString += accel.y;
+  dataString += accel.y();
   dataString += ",";
-  dataString += accel.z;
+  dataString += accel.z();
 
 
   // open the file. note that only one file can be open at a time,
@@ -673,7 +709,6 @@ void loop() {
     display.display();
 
 
-
   } else {
 
 
@@ -713,18 +748,28 @@ void loop() {
 
       if (enableMotors) {
 
+        //test tracking
+        //if(millis()>10000 && xSetpoint<180) xSetpoint+=2;
+        
+
         if (xOutput < 0)  m1->run(BACKWARD);
         else  m1->run(FORWARD);
         m1->setSpeed( abs(xOutput) );
         //
-        //        if (yOutput < 0)  m2->run(BACKWARD);
-        //        else  m2->run(FORWARD);
-        //        m2->setSpeed( abs(yOutput) );
-        //
-        //                if (zOutput < 0)  m4->run(BACKWARD);
-        //                else  m4->run(FORWARD);
-        //                m4->setSpeed( abs(zOutput) );
+
+        if (yOutput < 0)  m2->run(BACKWARD);
+        else  m2->run(FORWARD);
+        m2->setSpeed( abs(yOutput) );
+        
+        
+        if (zOutput < 0)  m4->run(BACKWARD);
+        else  m4->run(FORWARD);
+        m4->setSpeed( abs(zOutput) );
+        
         // delay(20);
+        
+        //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+        logData();
       }
 
       else {
@@ -772,29 +817,29 @@ void loop() {
 
     display.print("IMU X: ");
     char c[12];
-    sprintf(c, "%+07.1f", x);//add + to positive numbers, leading zeros
+    sprintf(c, "%+06.1f", x);//add + to positive numbers, leading zeros
     display.print(c);
 
     display.print(" Y: ");
-    sprintf(c, "%+07.1f", y);
+    sprintf(c, "%+06.1f", y);
     display.print(c);
 
     display.print(" Z: ");
-    sprintf(c, "%+07.1f", z);
+    sprintf(c, "%+06.1f", z);
     display.print(c);
 
     display.println();
 
     display.print("SET X: ");
-    sprintf(c, "%+07.1f", xSetpoint);//add + to positive numbers, leading zeros
+    sprintf(c, "%+06.1f", xSetpoint);//add + to positive numbers, leading zeros
     display.print(c);
 
     display.print(" Y: ");
-    sprintf(c, "%+07.1f", ySetpoint);
+    sprintf(c, "%+06.1f", ySetpoint);
     display.print(c);
 
     display.print(" Z: ");
-    sprintf(c, "%+07.1f", zSetpoint);
+    sprintf(c, "%+06.1f", zSetpoint);
     display.print(c);
 
     display.println();
@@ -803,13 +848,13 @@ void loop() {
 
       display.print("SPD X: " );
 
-      sprintf(c, "%+07.1f", xOutput);//add + to positive numbers, leading zeros
+      sprintf(c, "%+06.1f", xOutput);//add + to positive numbers, leading zeros
       display.print(c);
       display.print(" Y: ");
-      sprintf(c, "%+07.1f", yOutput);
+      sprintf(c, "%+06.1f", yOutput);
       display.print(c);
       display.print(" Z: ");
-      sprintf(c, "%+07.2f", zOutput);
+      sprintf(c, "%+06.2f", zOutput);
       display.print(c);
 
     } else {
@@ -859,8 +904,7 @@ void loop() {
     //  Serial.print(", X_Speed:");
     //  Serial.println(xOutput);
 
-    //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
-    logData();
+
 
   }
   //buttons/////////////////////////////////////////////////////////////////////////////////////////////////////////
