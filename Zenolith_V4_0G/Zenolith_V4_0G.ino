@@ -402,15 +402,15 @@ void updateIMU() {
   //    YOffset += 360;
   //  }
   //
-  //  diff = z - lastZ;
-  //  if (diff > 180)
-  //  {
-  //    ZOffset -= 360;
-  //  }
-  //  else if (diff < -180)
-  //  {
-  //    ZOffset += 360;
-  //  }
+    diff = z - lastZ;
+    if (diff > 180)
+    {
+      ZOffset -= 360;
+    }
+    else if (diff < -180)
+    {
+      ZOffset += 360;
+    }
 
 
   x = euler.x() + XOffset;
