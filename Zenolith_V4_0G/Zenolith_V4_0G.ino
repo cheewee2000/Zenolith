@@ -6,6 +6,22 @@
 float measuredvbat;
 boolean chargeMode = false;
 
+//json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <ArduinoJson.h>
+#include <SD.h>
+const int chipSelect = 10; //m4
+int id = 0;
+
+//struct Config {
+//  char UUID[64];
+//  float xSetpoint;
+//  float ySetpoint;
+//  float zSetpoint;
+//
+//};
+const char *filename = "UUID.txt";  // <- SD library uses 8.3 filenames
+//Config config;                         // <- global configuration object
+
 // PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://github.com/br3ttb/Arduino-PID-Library
 #include <PID_v1.h>
@@ -15,7 +31,9 @@ double x, xSetpoint, xInput, xOutput;
 double y, ySetpoint, yInput, yOutput;
 double z, zSetpoint, zInput, zOutput;
 
-
+float  xSetpointFuture;
+float  ySetpointFuture;
+float  zSetpointFuture;
 
 //Specify the links and initial tuning parameters
 /*
@@ -84,6 +102,43 @@ boolean enableMotorX = true;
 boolean enableMotorY = true;
 boolean enableMotorZ = true;
 
+boolean enableParallelMotors = false;
+int motorSequence = 0;
+
+void runMotorX() {
+  if (enableMotorX) {
+    if (xOutput < 0)  m1->run(BACKWARD);
+    else  m1->run(FORWARD);
+    m1->setSpeed( abs(xOutput) );
+  }
+  else {
+    m1->setSpeed(0);
+  }
+}
+
+
+void runMotorY() {
+  if (enableMotorY) {
+    if (yOutput < 0)  m2->run(BACKWARD);
+    else  m2->run(FORWARD);
+    m2->setSpeed( abs(yOutput) );
+
+  } else {
+    m2->setSpeed(0);
+  }
+}
+
+void runMotorZ() {
+  if (enableMotorZ) {
+    if (zOutput < 0)  m4->run(BACKWARD);
+    else  m4->run(FORWARD);
+    m4->setSpeed( abs(zOutput) );
+  } else {
+    m4->setSpeed(0);
+  }
+}
+
+
 //TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //setup serial2
 #include <Arduino.h>   // required before wiring_private.h
@@ -93,6 +148,12 @@ long lastTalk;
 int volume = 10;
 
 //IMU  /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//ranges
+//YAW X 0 360
+//PITCH X 0 -90 0 90 0
+//RoLL X -180 0 180
+
 float XOffset = 0;
 float YOffset = 0;
 float ZOffset = 0;
@@ -102,24 +163,10 @@ float lastY = 0;
 float lastZ = 0;
 
 
+
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <ArduinoJson.h>
-#include <SD.h>
-const int chipSelect = 10; //m4
-int id = 0;
 
-struct Config {
-  char UUID[64];
-  float xSetpoint;
-  float ySetpoint;
-  float zSetpoint;
-
-};
-const char *filename = "UUID.txt";  // <- SD library uses 8.3 filenames
-Config config;                         // <- global configuration object
-
-
-void loadConfiguration(const char *filename, Config &config, String UUID) {
+void loadConfiguration(const char *filename, String UUID) {
   // Open file for reading
   File file = SD.open(filename);
   // Allocate a temporary JsonDocument
@@ -158,9 +205,9 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
   }
 
 
-  xSetpoint = doc[UUID]["xSetpoint"] | xSetpoint;
-  ySetpoint = doc[UUID]["ySetpoint"] | ySetpoint;
-  zSetpoint = doc[UUID]["zSetpoint"] | zSetpoint;
+  xSetpointFuture = doc[UUID]["xSetpoint"] | xSetpoint;
+  ySetpointFuture = doc[UUID]["ySetpoint"] | ySetpoint;
+  zSetpointFuture = doc[UUID]["zSetpoint"] | zSetpoint;
 
 
   Kp = doc[UUID]["P"] | Kp;
@@ -198,7 +245,9 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
     lastY = y;
     lastZ = z;
 
-    //reset PID values
+    motorSequence = 0;
+
+    //reload PID values from settings.json
   }
 
   //Serial.println(config.xSetpoint );
@@ -210,11 +259,12 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
   enableMotorZ = doc[UUID]["enableMotorZ"] | int(enableMotorZ);
 
 
-  //  if (enableMotors) {
-  //    enableMotorX = true;
-  //    enableMotorY = true;
-  //    enableMotorZ = true;
-  //  }
+  enableParallelMotors = doc[UUID]["enableParallelMotors"] | int(enableParallelMotors);
+
+  if (!enableParallelMotors) {
+    motorSequence = 0;
+  }
+
 
 
 
@@ -344,7 +394,7 @@ void handleNFCDetected() {
     Serial.print("Found card : ");
     Serial.println(cardId );
 
-    loadConfiguration(filename, config, String(cardId));
+    loadConfiguration(filename, String(cardId));
 
     //Serial2.write("SBEEP\n");
   }
@@ -402,15 +452,16 @@ void updateIMU() {
   //    YOffset += 360;
   //  }
   //
-    diff = z - lastZ;
-    if (diff > 180)
-    {
-      ZOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      ZOffset += 360;
-    }
+
+  diff = z - lastZ;
+  if (diff > 180)
+  {
+    ZOffset -= 360;
+  }
+  else if (diff < -180)
+  {
+    ZOffset += 360;
+  }
 
 
   x = euler.x() + XOffset;
@@ -807,31 +858,38 @@ void loop() {
         //test tracking
         //if(millis()>10000 && xSetpoint<180) xSetpoint+=2;
 
-        if (enableMotorX) {
-          if (xOutput < 0)  m1->run(BACKWARD);
-          else  m1->run(FORWARD);
-          m1->setSpeed( abs(xOutput) );
+        if (enableParallelMotors) {
+          xSetpoint = xSetpointFuture;
+          ySetpoint = ySetpointFuture;
+          zSetpoint = zSetpointFuture;
+
         }
         else {
-          m1->setSpeed(0);
+
+          float m = 3; //margin
+          if (motorSequence < 10) {
+            xSetpoint = xSetpointFuture;
+
+            //check if X is close to setpoint
+            if (x >= xSetpoint - m && x <= xSetpoint + m ) motorSequence++;
+          }
+          else if (motorSequence < 20) {
+            xSetpoint = xSetpointFuture;
+            ySetpoint = ySetpointFuture;
+
+            if (y >= ySetpoint - m && y <= ySetpoint + m ) motorSequence++;
+          }
+          else {
+            xSetpoint = xSetpointFuture;
+            ySetpoint = ySetpointFuture;
+            zSetpoint = zSetpointFuture;
+
+          }
         }
 
-        if (enableMotorY) {
-          if (yOutput < 0)  m2->run(BACKWARD);
-          else  m2->run(FORWARD);
-          m2->setSpeed( abs(yOutput) );
-
-        } else {
-          m2->setSpeed(0);
-        }
-
-        if (enableMotorZ) {
-          if (zOutput < 0)  m4->run(BACKWARD);
-          else  m4->run(FORWARD);
-          m4->setSpeed( abs(zOutput) );
-        } else {
-          m4->setSpeed(0);
-        }
+        runMotorX();
+        runMotorY();
+        runMotorZ();
 
         //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
         logData();
@@ -948,13 +1006,14 @@ void loop() {
       measuredvbat = measuredvbat - 3.20; //3.2-4.2
       measuredvbat = measuredvbat * 100;
     }
-    display.print("VBat: " );
+    display.print("BAT: " );
     display.print(measuredvbat, 0);
     display.print("%");
 
-    display.println();
+    display.print(" | ");
 
     DateTime now = rtc.now();
+    display.print("UTC: ");
     display.print(now.year(), DEC);
     display.print('/');
     display.print(now.month(), DEC);
