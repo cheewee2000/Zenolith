@@ -140,7 +140,7 @@ void setup() {
 }
 
 void loop() {
-  Serial.println(".");
+  //Serial.println(".");
   delay(500);
 
   

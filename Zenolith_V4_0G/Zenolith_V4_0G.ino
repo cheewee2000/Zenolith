@@ -1,6 +1,6 @@
-
-#include <SPI.h>
 #include <Wire.h>
+#include <SPI.h>
+
 //battery
 #define VBATPIN A6
 float measuredvbat;
@@ -46,15 +46,21 @@ double z, zSetpoint, zInput, zOutput;
 //float Kd = 2.7;
 
 
-//single axis
+////single axis
 //float Kp = 14.90;
 //float Ki = 0.2;
 //float Kd = 4.3;
 
 //all axis + 4/6 shells
-float Kp = 15.70;
+//float Kp = 15.70;
+//float Ki = 0.2;
+//float Kd = 4.9;
+
+//single axis half shell
+float Kp = 14.90;
 float Ki = 0.2;
-float Kd = 4.9;
+float Kd = 5.4;
+
 
 
 PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);
@@ -74,6 +80,9 @@ Adafruit_DCMotor *m2 = AFMS.getMotor(2);
 Adafruit_DCMotor *m4 = AFMS.getMotor(4);
 
 boolean enableMotors = true;
+boolean enableMotorX = true;
+boolean enableMotorY = true;
+boolean enableMotorZ = true;
 
 //TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //setup serial2
@@ -81,6 +90,16 @@ boolean enableMotors = true;
 #include "wiring_private.h" // pinPeripheral() function
 Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 long lastTalk;
+int volume = 10;
+
+//IMU  /////////////////////////////////////////////////////////////////////////////////////////////////////////
+float XOffset = 0;
+float YOffset = 0;
+float ZOffset = 0;
+
+float lastX = 0;
+float lastY = 0;
+float lastZ = 0;
 
 
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,7 +134,17 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
 
   id = doc[UUID]["id"] | -1;
 
+  volume += doc[UUID]["volume"] | 0;
+  setTTSVolume();
+
   const char *say = doc[UUID]["say"] | "error";
+
+  //  if (strcmp(say, "error") == 0) {
+  //    file.close();
+  //    return;
+  //  }
+
+
 
   if (id >= 0) {
     char c[20];
@@ -155,9 +184,42 @@ void loadConfiguration(const char *filename, Config &config, String UUID) {
   zPID.SetTunings( Kp,  Ki,  Kd);
 
 
-  enableMotors = doc[UUID]["enableMotors"] | 1;
+
+
+  boolean resetZenolith = doc[UUID]["reset"] | 0;
+  if (resetZenolith) {
+
+
+    XOffset = -x + XOffset;
+    YOffset = -y + YOffset;
+    ZOffset = -z + ZOffset;
+
+    lastX = x;
+    lastY = y;
+    lastZ = z;
+
+    //reset PID values
+  }
 
   //Serial.println(config.xSetpoint );
+  enableMotors = doc[UUID]["enableMotors"] | 1;
+
+
+  enableMotorX = doc[UUID]["enableMotorX"] | int(enableMotorX);
+  enableMotorY = doc[UUID]["enableMotorY"] | int(enableMotorY);
+  enableMotorZ = doc[UUID]["enableMotorZ"] | int(enableMotorZ);
+
+
+  //  if (enableMotors) {
+  //    enableMotorX = true;
+  //    enableMotorY = true;
+  //    enableMotorZ = true;
+  //  }
+
+
+
+
+
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -177,8 +239,11 @@ void SERCOM0_2_Handler()
   Serial2.IrqHandler();
 }
 
-
-
+void setTTSVolume() {
+  Serial2.write("V");//Vx Set audio volume (dB): x = -48 to 18
+  Serial2.write(volume);//Vx Set audio volume (dB): x = -48 to 18
+  Serial2.write("\n");//Vx Set audio volume (dB): x = -48 to 18
+}
 
 //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://github.com/adafruit/Adafruit-PN532
@@ -297,98 +362,66 @@ void handleNFCDetected() {
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
+
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
+
 #define BNO055_SAMPLERATE_DELAY_MS (10) //10-1000
-sensors_event_t event;
+
 unsigned long lastUpdate;
-float lastX = 0;
-
-//unsigned long lastYUpdate;
-float lastY = 0;
-
-//unsigned long lastZUpdate;
-float lastZ = 0;
-
-float XOffset = 0;
-float YOffset = 0;
-float ZOffset = 0;
 
 boolean gyroCalibrated = false;
 
+
 void updateIMU() {
-  //if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS)
+  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+
+  x = euler.x() + XOffset;
+  y = euler.y() + YOffset;
+  z = euler.z() + ZOffset;
+
+
+
+  // Get absolute X
+  float diff = x - lastX;
+  if (diff > 180)
   {
-
-
-    imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-
-    /* Display the floating point data */
-    //    Serial.print("X: ");
-    //    Serial.print(euler.x());
-    //    Serial.print(" Y: ");
-    //    Serial.print(euler.y());
-    //    Serial.print(" Z: ");
-    //    Serial.print(euler.z());
-    //    Serial.println("");
-
-    x = euler.x() + XOffset;
-    y = euler.y() + YOffset;
-    z = euler.z() + ZOffset;
-
-    //sensors_event_t event;
-    //bno.getEvent(&event);
-    //    x = event.orientation.x + XOffset;
-    //    y = event.orientation.y + YOffset;
-    //    z = event.orientation.z + ZOffset;
-
-
-    // Get absolute X
-    float diff = x - lastX;
-    if (diff > 180)
-    {
-      XOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      XOffset += 360;
-    }
-
-    diff = y - lastY;
-    if (diff > 180)
-    {
-      YOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      YOffset += 360;
-    }
-
-    diff = z - lastZ;
-    if (diff > 180)
-    {
-      ZOffset -= 360;
-    }
-    else if (diff < -180)
-    {
-      ZOffset += 360;
-    }
-
-
-    //   lastUpdate = millis();
-    //    x = event.orientation.x + XOffset;
-    //    y = event.orientation.y + YOffset;
-    //    z = event.orientation.z + ZOffset;
-
-    x = euler.x() + XOffset;
-    y = euler.y() + YOffset;
-    z = euler.z() + ZOffset;
-
-    lastX = x;
-    lastY = y;
-    lastZ = z;
-
+    XOffset -= 360;
   }
+  else if (diff < -180)
+  {
+    XOffset += 360;
+  }
+
+  //  diff = y - lastY;
+  //  if (diff > 180)
+  //  {
+  //    YOffset -= 360;
+  //  }
+  //  else if (diff < -180)
+  //  {
+  //    YOffset += 360;
+  //  }
+  //
+  //  diff = z - lastZ;
+  //  if (diff > 180)
+  //  {
+  //    ZOffset -= 360;
+  //  }
+  //  else if (diff < -180)
+  //  {
+  //    ZOffset += 360;
+  //  }
+
+
+  x = euler.x() + XOffset;
+  y = euler.y() + YOffset;
+  z = euler.z() + ZOffset;
+
+  lastX = x;
+  lastY = y;
+  lastZ = z;
 }
+
 
 
 int gyroStatus(void)
@@ -398,7 +431,7 @@ int gyroStatus(void)
   /* 3 means 'fully calibrated" */
   uint8_t system, gyro, accel, mag;
   system = gyro = accel = mag = 0;
-  bno.getCalibration(&system, &gyro, &accel, &mag);
+  //bno.getCalibration(&system, &gyro, &accel, &mag);
 
   /* Display the individual values */
   //  Serial.print(" G:");
@@ -457,14 +490,16 @@ void logData() {
 
 
 
-  imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+  //  imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+  //
+  //  dataString += ",";
+  //  dataString += accel.x();
+  //  dataString += ",";
+  //  dataString += accel.y();
+  //  dataString += ",";
+  //  dataString += accel.z();
 
-  dataString += ",";
-  dataString += accel.x();
-  dataString += ",";
-  dataString += accel.y();
-  dataString += ",";
-  dataString += accel.z();
+
 
 
   // open the file. note that only one file can be open at a time,
@@ -516,11 +551,28 @@ RTC_DS3231 rtc;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  Serial.begin(115200);
-  //while (!Serial);
-  delay(3000);
+
+  Serial.begin(9600);
+  delay(5000);
   Serial.println("Hello");
-  delay(50);
+
+  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  /* Initialise the sensor */
+  if (!bno.begin(bno.OPERATION_MODE_IMUPLUS))
+    //if (!bno.begin())
+
+  {
+    /* There was a problem detecting the BNO055 ... check your connections */
+    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+    while (1);
+  }
+  delay(1000);
+  bno.setExtCrystalUse(true);
+
+
+
+  //gyroStatus();
+
 
   //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -535,9 +587,7 @@ void setup() {
   Serial.println("card initialized.");
 
 
-  //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  AFMS.begin();  // create with the default frequency 1.6KHz
-  delay(50);
+
 
   //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (! rtc.begin()) {
@@ -615,22 +665,15 @@ void setup() {
   //delay(3000);
   Serial2.write("W180\n");//Wx Set speaking rate (words/minute): x = 75 to 600
   delay(50);
-  Serial2.write("V15\n");//Vx Set audio volume (dB): x = -48 to 18
+  //  Serial2.write("V");//Vx Set audio volume (dB): x = -48 to 18
+  //  Serial2.write(volume);//Vx Set audio volume (dB): x = -48 to 18
+  //  Serial2.write("\n");//Vx Set audio volume (dB): x = -48 to 18
+  setTTSVolume();
   delay(50);
   //Serial2.write("SI am zenolith.\n");
 
 
-  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  /* Initialise the sensor */
-  if (!bno.begin())
-  {
-    /* There was a problem detecting the BNO055 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
-    while (1);
-  }
-  delay(200);
-  bno.setExtCrystalUse(true);
-  gyroStatus();
+
 
   //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -655,8 +698,11 @@ void setup() {
 
   startListeningToNFC();
 
-  //Motor Driver/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
   AFMS.begin();  // create with the default frequency 1.6KHz
+  delay(50);
+  Serial.println("motors on");
+
 
   //PID /////////////////////////////////////////////////////////////////////////////////////////////////////////
   xPID.SetMode(AUTOMATIC);
@@ -668,6 +714,11 @@ void setup() {
   xSetpoint = 0;
   ySetpoint = 0;
   zSetpoint = 0;
+
+
+
+
+
 
 
 }
@@ -750,36 +801,40 @@ void loop() {
 
         //test tracking
         //if(millis()>10000 && xSetpoint<180) xSetpoint+=2;
-        
 
-        if (xOutput < 0)  m1->run(BACKWARD);
-        else  m1->run(FORWARD);
-        m1->setSpeed( abs(xOutput) );
-        //
+        if (enableMotorX) {
+          if (xOutput < 0)  m1->run(BACKWARD);
+          else  m1->run(FORWARD);
+          m1->setSpeed( abs(xOutput) );
+        }
+        else {
+          m1->setSpeed(0);
+        }
 
-        if (yOutput < 0)  m2->run(BACKWARD);
-        else  m2->run(FORWARD);
-        m2->setSpeed( abs(yOutput) );
-        
-        
-        if (zOutput < 0)  m4->run(BACKWARD);
-        else  m4->run(FORWARD);
-        m4->setSpeed( abs(zOutput) );
-        
-        // delay(20);
-        
+        if (enableMotorY) {
+          if (yOutput < 0)  m2->run(BACKWARD);
+          else  m2->run(FORWARD);
+          m2->setSpeed( abs(yOutput) );
+
+        } else {
+          m2->setSpeed(0);
+        }
+
+        if (enableMotorZ) {
+          if (zOutput < 0)  m4->run(BACKWARD);
+          else  m4->run(FORWARD);
+          m4->setSpeed( abs(zOutput) );
+        } else {
+          m4->setSpeed(0);
+        }
+
         //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
         logData();
       }
-
       else {
-
         m1->setSpeed(0);
         m2->setSpeed(0);
         m4->setSpeed(0);
-
-        delay(20);
-
       }
     }
 
