@@ -536,7 +536,8 @@ Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
 
 //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include "RTClib.h"
-RTC_DS3231 rtc;
+//RTC_DS3231 rtc;
+RTC_PCF8523 rtc;
 
 
 
@@ -605,6 +606,10 @@ void setup() {
     // January 21, 2014 at 3am you would call:
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
+
+  //rtc.adjust(DateTime(2020, 5, 14, 3, 36, 0));
+  rtc.start();
+
   delay(50);
 
 
@@ -946,6 +951,22 @@ void loop() {
     display.print("VBat: " );
     display.print(measuredvbat, 0);
     display.print("%");
+
+    display.println();
+
+    DateTime now = rtc.now();
+    display.print(now.year(), DEC);
+    display.print('/');
+    display.print(now.month(), DEC);
+    display.print('/');
+    display.print(now.day(), DEC);
+    display.print("  ");
+    display.print(now.hour(), DEC);
+    display.print(':');
+    display.print(now.minute(), DEC);
+    display.print(':');
+    display.print(now.second(), DEC);
+    display.println();
 
 
     display.display();
