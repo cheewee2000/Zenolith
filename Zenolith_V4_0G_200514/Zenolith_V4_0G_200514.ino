@@ -1,6 +1,8 @@
 #include <Wire.h>
 #include <SPI.h>
 
+float margin = 5;
+
 //battery
 #define VBATPIN A6
 float measuredvbat;
@@ -359,6 +361,8 @@ void loadSettings(const char *filename) {
   Ki = doc["Ki"] | Ki;
   Kd = doc["Kd"] | Kd;
   volume = doc["volume"] | volume;
+  margin = doc["margin"] | margin;
+
   setTTSVolume();
 
   // Close the file (Curiously, File's destructor doesn't close the file)
@@ -393,6 +397,7 @@ void saveSettings(const char *filename) {
   doc["Ki"] = Ki;
   doc["Kd"] = Kd;
   doc["volume"] = volume;
+  doc["margin"] = margin;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -988,18 +993,18 @@ void loop() {
         }
         else {
 
-          float m = 3; //margin
+          margin = 3; //margin
           if (motorSequence < 10) {
             xSetpoint = xSetpointFuture;
 
             //check if X is close to setpoint
-            if (x >= xSetpoint - m && x <= xSetpoint + m ) motorSequence++;
+            if (x >= xSetpoint - margin && x <= xSetpoint + margin ) motorSequence++;
           }
           else if (motorSequence < 20) {
             xSetpoint = xSetpointFuture;
             ySetpoint = ySetpointFuture;
 
-            if (y >= ySetpoint - m && y <= ySetpoint + m ) motorSequence++;
+            if (y >= ySetpoint - margin && y <= ySetpoint + margin ) motorSequence++;
           }
           else {
             xSetpoint = xSetpointFuture;
@@ -1087,16 +1092,21 @@ void loop() {
     if (enableMotors) {
 
       display.print("SPD X: " );
-
       sprintf(c, " % +06.1f", xOutput);//add + to positive numbers, leading zeros
-      display.print(c);
+      if (enableMotorX) display.print(c);
+      else display.print("XXX");      
+      
       display.print(" Y: ");
       sprintf(c, " % +06.1f", yOutput);
-      display.print(c);
+      if (enableMotorY) display.print(c);
+      else display.print("XXX");
+
+
       display.print(" Z: ");
       sprintf(c, " % +06.2f", zOutput);
-      display.print(c);
-
+      if (enableMotorZ) display.print(c);
+      else display.print("XXX");
+      
     } else {
       display.print("MOTORS DISABLED" );
     }
@@ -1135,6 +1145,13 @@ void loop() {
     //display.print(" | ");
     display.println();
 
+
+    display.print("margin: " );
+    display.print(margin, 1);
+    //display.print(" | ");
+    display.println();
+
+
     DateTime now = rtc.now();
     display.print("UTC: ");
     display.print(now.year(), DEC);
@@ -1155,8 +1172,8 @@ void loop() {
     int yPos = display.height() - 20;
 
     display.drawCircle(xPos, yPos, 10, 1);
-    float xArrow = cos(radians(xSetpoint-x)) * 15;
-    float yArrow = sin(radians(xSetpoint-x)) * 15;
+    float xArrow = cos(radians(xSetpoint - x)) * 15;
+    float yArrow = sin(radians(xSetpoint - x)) * 15;
 
     display.drawLine(xPos, yPos, xPos - xArrow, yPos + yArrow, 1);
 
