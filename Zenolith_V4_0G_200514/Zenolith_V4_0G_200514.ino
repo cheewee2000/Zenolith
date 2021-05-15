@@ -91,9 +91,9 @@ float  zSetpointFuture;
 //float Kd = 4.9;
 
 //single axis half shell
-float Kp = 14.90;
-float Ki = 0.2;
-float Kd = 5.4;
+float Kp = 9.20;
+float Ki = 0.1;
+float Kd = 4.0;
 
 
 
