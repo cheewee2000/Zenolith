@@ -147,7 +147,36 @@ void runMotorZ() {
 #include "wiring_private.h" // pinPeripheral() function
 Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 long lastTalk;
-int volume = 18;
+int volume = 3;
+
+void SERCOM0_0_Handler()
+{
+  Serial2.IrqHandler();
+}
+//
+void SERCOM0_2_Handler()
+{
+  Serial2.IrqHandler();
+}
+
+void setTTSVolume() {
+
+  if (volume == 3)  Serial2.write("V18\n"); //Vx Set audio volume (dB): x = -48 to 18
+  else if (volume == 2)  Serial2.write("V10\n"); //Vx Set audio volume (dB): x = -48 to 18
+  else if (volume == 1)  Serial2.write("V0\n"); //Vx Set audio volume (dB): x = -48 to 18
+  else if (volume == 0)  Serial2.write("V-10\n"); //Vx Set audio volume (dB): x = -48 to 18
+
+  //  char c[8];
+  //  sprintf(c, "V%\n", volume);//add + to positive numbers, leading zeros
+
+  // Serial2.write(c);//Vx Set audio volume (dB): x = -48 to 18
+
+  Serial.println("Volume: ");
+  Serial.println(volume);
+
+
+
+}
 
 //IMU  /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -163,6 +192,8 @@ float ZOffset = 0;
 float lastX = 0;
 float lastY = 0;
 float lastZ = 0;
+
+
 
 
 
@@ -184,22 +215,36 @@ void loadConfiguration(const char *filename, String UUID) {
   id = doc[UUID]["id"] | -1;
 
   volume += doc[UUID]["volume"] | 0;
-  Serial.println(volume);
+  if (volume < 0)volume = 0;
+  else if (volume > 3)volume = 3;
+
   setTTSVolume();
 
   const char *say = doc[UUID]["say"] | "error";
 
-  Serial2.write("S");
-  Serial2.write(say); //say
-  Serial2.write("\n");
+  //if it's a setpoint card enable motors
 
+  if (id >= 0) {
+    char c[20];
+    sprintf(c, "S%d", id);
+    Serial2.write(c); //say ID
+    Serial2.write("\n");
 
-  if (strcmp(say, "error") == 0) {
-    file.close();
-    return;
+    enableMotors = true;
+    motorSequence = 0;
+
+  } else {
+    Serial2.write("S");
+    Serial2.write(say); //say
+    Serial2.write("\n");
   }
 
 
+
+  //  if (strcmp(say, "error") == 1) {
+  //    file.close();
+  //    return;
+  //  }
 
   xSetpointFuture = doc[UUID]["xSetpoint"] | xSetpoint;
   ySetpointFuture = doc[UUID]["ySetpoint"] | ySetpoint;
@@ -224,7 +269,7 @@ void loadConfiguration(const char *filename, String UUID) {
   zPID.SetTunings( Kp,  Ki,  Kd);
 
   //Serial.println(config.xSetpoint );
-  enableMotors = doc[UUID]["enableMotors"] | 1;
+  enableMotors = doc[UUID]["enableMotors"] | int(enableMotors);
 
   enableMotorX = doc[UUID]["enableMotorX"] | int(enableMotorX);
   enableMotorY = doc[UUID]["enableMotorY"] | int(enableMotorY);
@@ -264,6 +309,9 @@ void loadConfiguration(const char *filename, String UUID) {
   boolean save = doc[UUID]["save"] | 0;
   if (save) saveSettings(settings);
 
+
+
+
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
 }
@@ -285,6 +333,7 @@ void loadSettings(const char *filename) {
   Kp = doc["Kp"] | Kp;
   Ki = doc["Ki"] | Ki;
   Kd = doc["Kd"] | Kd;
+  volume = doc["volume"] | volume;
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -312,6 +361,7 @@ void saveSettings(const char *filename) {
   doc["Kp"] = Kp;
   doc["Ki"] = Ki;
   doc["Kd"] = Kd;
+  doc["volume"] = volume;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -324,23 +374,6 @@ void saveSettings(const char *filename) {
 
 
 
-//TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void SERCOM0_0_Handler()
-{
-  Serial2.IrqHandler();
-}
-//
-void SERCOM0_2_Handler()
-{
-  Serial2.IrqHandler();
-}
-
-void setTTSVolume() {
-  Serial2.write("V");//Vx Set audio volume (dB): x = -48 to 18
-  Serial2.write(volume);//Vx Set audio volume (dB): x = -48 to 18
-  Serial2.write("\n");//Vx Set audio volume (dB): x = -48 to 18
-}
 
 //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //https://github.com/adafruit/Adafruit-PN532
@@ -655,63 +688,6 @@ void setup() {
   delay(5000);
   Serial.println("Hello");
 
-
-  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  /* Initialise the sensor */
-  if (!bno.begin(bno.OPERATION_MODE_IMUPLUS))
-    //if (!bno.begin())
-
-  {
-    /* There was a problem detecting the BNO055 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
-    while (1);
-  }
-  delay(1000);
-  bno.setExtCrystalUse(true);
-
-
-
-  //gyroStatus();
-
-
-  //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  Serial.print("Initializing SD card...");
-
-  // see if the card is present and can be initialized:
-  if (!SD.begin(chipSelect)) {
-    Serial.println("Card failed, or not present");
-    // don't do anything more:
-    while (1);
-  }
-  Serial.println("card initialized.");
-
-
-
-
-  //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  if (! rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    Serial.flush();
-    abort();
-  }
-
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, let's set the time!");
-    // When time needs to be set on a new device, or after a power loss, the
-    // following line sets the RTC to the date & time this sketch was compiled
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-  }
-
-  //rtc.adjust(DateTime(2020, 5, 14, 3, 36, 0));
-  rtc.start();
-
-  delay(50);
-
-
   //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -762,6 +738,71 @@ void setup() {
   delay(50);
 
 
+  //IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  /* Initialise the sensor */
+  if (!bno.begin(bno.OPERATION_MODE_IMUPLUS))
+    //if (!bno.begin())
+
+  {
+    /* There was a problem detecting the BNO055 ... check your connections */
+    Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+    display.print("no BNO055 detected");
+    display.println();
+
+    display.display(); // actually display all of the above
+    delay(50);
+
+    while (1);
+  }
+  delay(1000);
+  bno.setExtCrystalUse(true);
+
+
+
+  //gyroStatus();
+
+
+  //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  Serial.print("Initializing SD card...");
+
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    while (1);
+  }
+  Serial.println("card initialized.");
+
+
+
+
+  //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    abort();
+  }
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
+
+  //rtc.adjust(DateTime(2020, 5, 14, 3, 36, 0));
+  rtc.start();
+
+  delay(50);
+
+
+
+
+
   //TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
   Serial2.begin(9600);
   pinPeripheral(A5, PIO_SERCOM_ALT);
@@ -788,6 +829,11 @@ void setup() {
     uint32_t versiondata = nfc.getFirmwareVersion();
     if (! versiondata) {
       Serial.print("Didn't find PN53x board");
+      display.print("Didn't find PN53x board");
+      display.println();
+      display.display(); // actually display all of the above
+      delay(50);
+
       while (1); // halt
     }
 
