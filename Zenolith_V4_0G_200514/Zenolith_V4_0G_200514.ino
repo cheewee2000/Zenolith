@@ -1094,18 +1094,18 @@ void loop() {
       display.print("SPD X: " );
       sprintf(c, " % +06.1f", xOutput);//add + to positive numbers, leading zeros
       if (enableMotorX) display.print(c);
-      else display.print("XXX");      
+      else display.print("  XXX.X");
       
       display.print(" Y: ");
       sprintf(c, " % +06.1f", yOutput);
       if (enableMotorY) display.print(c);
-      else display.print("XXX");
+      else display.print("  XXX.X");
 
 
       display.print(" Z: ");
       sprintf(c, " % +06.2f", zOutput);
       if (enableMotorZ) display.print(c);
-      else display.print("XXX");
+      else display.print("  XXX.X");
       
     } else {
       display.print("MOTORS DISABLED" );
