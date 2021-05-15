@@ -923,16 +923,16 @@ void loop() {
       measuredvbat *= 2;    // we divided by 2, so multiply back
       measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
       measuredvbat /= 1024; // convert to voltage
-      measuredvbat = measuredvbat - 3.20; //3.2-4.2
-      measuredvbat = measuredvbat * 100;
+      //      measuredvbat = measuredvbat - 3.20; //3.2-4.2
+      //      measuredvbat = measuredvbat * 100;
     }
 
     display.setFont(); //normal font
     display.clearDisplay();
     display.setCursor(0, 0);
-    display.print("VBat: " );
-    display.print(measuredvbat, 0);
-    display.print(" % ");
+    display.print("BATT: " );
+    display.print(measuredvbat, 2);
+    display.print("V ");
 
 
     display.display();
@@ -1125,14 +1125,15 @@ void loop() {
       measuredvbat *= 2;    // we divided by 2, so multiply back
       measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
       measuredvbat /= 1024; // convert to voltage
-      measuredvbat = measuredvbat - 3.20; //3.2-4.2
-      measuredvbat = measuredvbat * 100;
+      //      measuredvbat = measuredvbat - 3.20; //3.2-4.2
+      //      measuredvbat = measuredvbat * 100;
     }
     display.print("BAT: " );
-    display.print(measuredvbat, 0);
-    display.print(" % ");
+    display.print(measuredvbat, 2);
+    display.print("V ");
 
-    display.print(" | ");
+    //display.print(" | ");
+    display.println();
 
     DateTime now = rtc.now();
     display.print("UTC: ");
@@ -1149,6 +1150,24 @@ void loop() {
     display.print(now.second(), DEC);
     display.println();
 
+    //bubble level
+    int xPos = display.width() - 20;
+    int yPos = display.height() - 20;
+
+    display.drawCircle(xPos, yPos, 10, 1);
+    float xArrow = cos(radians(xSetpoint-x)) * 15;
+    float yArrow = sin(radians(xSetpoint-x)) * 15;
+
+    display.drawLine(xPos, yPos, xPos - xArrow, yPos + yArrow, 1);
+
+    float xOff = (ySetpoint - y) * .2;
+    float yOff = (zSetpoint - z) * .2;
+
+    float cXPos = xPos - xOff;
+    float cYPos = yPos - yOff;
+
+    display.fillCircle(cXPos, cYPos, 7, 1);
+    display.drawFastHLine(cXPos, cYPos, -5, 0);
 
     display.display();
 
