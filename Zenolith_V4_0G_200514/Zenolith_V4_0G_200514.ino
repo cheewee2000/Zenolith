@@ -597,7 +597,7 @@ int gyroStatus(void)
   /* 3 means 'fully calibrated" */
   uint8_t system, gyro, accel, mag;
   system = gyro = accel = mag = 0;
-  //bno.getCalibration(&system, &gyro, &accel, &mag);
+  bno.getCalibration(&system, &gyro, &accel, &mag);
 
   /* Display the individual values */
   //  Serial.print(" G:");
