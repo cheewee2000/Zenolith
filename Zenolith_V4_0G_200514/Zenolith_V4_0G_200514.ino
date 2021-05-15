@@ -6,6 +6,20 @@
 float measuredvbat;
 boolean chargeMode = false;
 
+//display/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+//#include <Fonts/Picopixel.h>
+//#include <Fonts/Org_01.h>
+//#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/TomThumb.h>
+
+Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
+#define BUTTON_A  9
+#define BUTTON_B  6
+//#define BUTTON_C  5
+
+
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <ArduinoJson.h>
 #include <SD.h>
@@ -209,9 +223,13 @@ void loadConfiguration(const char *filename, String UUID) {
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
-  if (error)
+  if (error) {
     Serial.println(F("Failed to read file, using default configuration"));
-
+    display.print("Failed to read file");
+    display.println();
+    display.display(); // actually display all of the above
+    delay(50);
+  }
   id = doc[UUID]["id"] | -1;
 
   volume += doc[UUID]["volume"] | 0;
@@ -285,13 +303,15 @@ void loadConfiguration(const char *filename, String UUID) {
   boolean resetZenolith = doc[UUID]["reset"] | 0;
   if (resetZenolith) {
 
+
     XOffset = -x + XOffset;
     YOffset = -y + YOffset;
     ZOffset = -z + ZOffset;
+    lastX = -x + XOffset;
+    lastY = -y + YOffset;
+    lastZ = -z + ZOffset;
 
-    lastX = x;
-    lastY = y;
-    lastZ = z;
+
 
     motorSequence = 0;
 
@@ -327,13 +347,19 @@ void loadSettings(const char *filename) {
 
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
-  if (error)
+  if (error) {
     Serial.println(F("Failed to read settings"));
+    display.print("Failed to read settings");
+    display.println();
+    display.display(); // actually display all of the above
+    delay(50);
+  }
 
   Kp = doc["Kp"] | Kp;
   Ki = doc["Ki"] | Ki;
   Kd = doc["Kd"] | Kd;
   volume = doc["volume"] | volume;
+  setTTSVolume();
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -349,6 +375,11 @@ void saveSettings(const char *filename) {
   File file = SD.open(filename, FILE_WRITE);
   if (!file) {
     Serial.println(F("Failed to create file"));
+    display.print("Failed to create file");
+    display.println();
+    display.display(); // actually display all of the above
+    delay(50);
+
     return;
   }
 
@@ -366,6 +397,10 @@ void saveSettings(const char *filename) {
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write to file"));
+    display.print("Failed to write to  file");
+    display.println();
+    display.display(); // actually display all of the above
+    delay(50);
   }
 
   // Close the file
@@ -651,18 +686,6 @@ void logData() {
 }
 
 
-//display/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
-//#include <Fonts/Picopixel.h>
-//#include <Fonts/Org_01.h>
-//#include <Fonts/FreeMono9pt7b.h>
-#include <Fonts/TomThumb.h>
-
-Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
-#define BUTTON_A  9
-#define BUTTON_B  6
-//#define BUTTON_C  5
 
 
 //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -769,6 +792,10 @@ void setup() {
   // see if the card is present and can be initialized:
   if (!SD.begin(chipSelect)) {
     Serial.println("Card failed, or not present");
+    display.print("Card failed, or not present");
+    display.println();
+    display.display(); // actually display all of the above
+    delay(50);
     // don't do anything more:
     while (1);
   }
@@ -905,7 +932,7 @@ void loop() {
     display.setCursor(0, 0);
     display.print("VBat: " );
     display.print(measuredvbat, 0);
-    display.print("%");
+    display.print(" % ");
 
 
     display.display();
@@ -1018,7 +1045,7 @@ void loop() {
     display.setFont(); //normal font
     display.print("ID: ");
     display.print(id);
-    display.print(":");
+    display.print(": ");
 
     display.println(cardId);
 
@@ -1030,29 +1057,29 @@ void loop() {
 
     display.print("IMU X: ");
     char c[12];
-    sprintf(c, "%+06.1f", x);//add + to positive numbers, leading zeros
+    sprintf(c, " % +06.1f", x);//add + to positive numbers, leading zeros
     display.print(c);
 
     display.print(" Y: ");
-    sprintf(c, "%+06.1f", y);
+    sprintf(c, " % +06.1f", y);
     display.print(c);
 
     display.print(" Z: ");
-    sprintf(c, "%+06.1f", z);
+    sprintf(c, " % +06.1f", z);
     display.print(c);
 
     display.println();
 
     display.print("SET X: ");
-    sprintf(c, "%+06.1f", xSetpoint);//add + to positive numbers, leading zeros
+    sprintf(c, " % +06.1f", xSetpoint);//add + to positive numbers, leading zeros
     display.print(c);
 
     display.print(" Y: ");
-    sprintf(c, "%+06.1f", ySetpoint);
+    sprintf(c, " % +06.1f", ySetpoint);
     display.print(c);
 
     display.print(" Z: ");
-    sprintf(c, "%+06.1f", zSetpoint);
+    sprintf(c, " % +06.1f", zSetpoint);
     display.print(c);
 
     display.println();
@@ -1061,13 +1088,13 @@ void loop() {
 
       display.print("SPD X: " );
 
-      sprintf(c, "%+06.1f", xOutput);//add + to positive numbers, leading zeros
+      sprintf(c, " % +06.1f", xOutput);//add + to positive numbers, leading zeros
       display.print(c);
       display.print(" Y: ");
-      sprintf(c, "%+06.1f", yOutput);
+      sprintf(c, " % +06.1f", yOutput);
       display.print(c);
       display.print(" Z: ");
-      sprintf(c, "%+06.2f", zOutput);
+      sprintf(c, " % +06.2f", zOutput);
       display.print(c);
 
     } else {
@@ -1103,7 +1130,7 @@ void loop() {
     }
     display.print("BAT: " );
     display.print(measuredvbat, 0);
-    display.print("%");
+    display.print(" % ");
 
     display.print(" | ");
 
@@ -1127,11 +1154,11 @@ void loop() {
 
 
     //serial/////////////////////////////////////////////////////////////////////////////////////////////////////////
-    //  Serial.print(", X_Set_Point:");
+    //  Serial.print(", X_Set_Point: ");
     //  Serial.print( xSetpoint );
-    //  Serial.print(", Current_X:");
+    //  Serial.print(", Current_X: ");
     //  Serial.print(x);
-    //  Serial.print(", X_Speed:");
+    //  Serial.print(", X_Speed: ");
     //  Serial.println(xOutput);
 
 
