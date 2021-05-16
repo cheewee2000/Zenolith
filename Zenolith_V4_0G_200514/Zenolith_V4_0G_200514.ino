@@ -205,12 +205,94 @@ float XOffset = 0;
 float YOffset = 0;
 float ZOffset = 0;
 
+
 float lastX = 0;
 float lastY = 0;
 float lastZ = 0;
 
 
 
+//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
+
+#define BNO055_SAMPLERATE_DELAY_MS (10) //10-1000
+
+unsigned long lastUpdate;
+
+boolean gyroCalibrated = false;
+
+
+void updateIMU() {
+  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+
+  x = euler.x() + XOffset;
+  y = euler.y() + YOffset;
+  z = euler.z() + ZOffset;
+
+
+
+  // Get absolute X
+  float diff = x - lastX;
+  if (diff > 180)
+  {
+    XOffset -= 360;
+  }
+  else if (diff < -180)
+  {
+    XOffset += 360;
+  }
+
+  //  diff = y - lastY;
+  //  if (diff > 180)
+  //  {
+  //    YOffset -= 360;
+  //  }
+  //  else if (diff < -180)
+  //  {
+  //    YOffset += 360;
+  //  }
+  //
+
+  diff = z - lastZ;
+  if (diff > 180)
+  {
+    ZOffset -= 360;
+  }
+  else if (diff < -180)
+  {
+    ZOffset += 360;
+  }
+
+
+  x = euler.x() + XOffset;
+  y = euler.y() + YOffset;
+  z = euler.z() + ZOffset;
+
+  lastX = x;
+  lastY = y;
+  lastZ = z;
+}
+
+
+
+int gyroStatus(void)
+{
+  /* Get the four calibration values (0..3) */
+  /* Any sensor data reporting 0 should be ignored, */
+  /* 3 means 'fully calibrated" */
+  uint8_t system, gyro, accel, mag;
+  system = gyro = accel = mag = 0;
+  bno.getCalibration(&system, &gyro, &accel, &mag);
+
+  /* Display the individual values */
+  //  Serial.print(" G:");
+  //  Serial.println(gyro, DEC);
+  return gyro;
+}
 
 
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -318,26 +400,29 @@ void loadConfiguration(const char *filename, String UUID) {
   boolean resetZenolith = doc[UUID]["reset"] | 0;
   if (resetZenolith) {
 
+    XOffset -= x ;
+    YOffset -= y ;
+    ZOffset -= z ;
 
-    XOffset = -x + XOffset;
-    YOffset = -y + YOffset;
-    ZOffset = -z + ZOffset;
-    lastX = -x + XOffset;
-    lastY = -y + YOffset;
-    lastZ = -z + ZOffset;
+    //get last values to prevent rollover
+    imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+    x = euler.x() + XOffset;
+    y = euler.y() + YOffset;
+    z = euler.z() + ZOffset;
 
+    lastX = x ;
+    lastY = y ;
+    lastZ = z ;
 
 
     motorSequence = 0;
 
     enableMotors = false;
-    enableMotorX = true;
-    enableMotorY = true;
-    enableMotorZ = true;
+    //    enableMotorX = true;
+    //    enableMotorY = true;
+    //    enableMotorZ = true;
 
     loadSettings(settings);
-
-
   }
 
 
@@ -541,87 +626,6 @@ void handleNFCDetected() {
 
 
 
-//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BNO055.h>
-#include <utility/imumaths.h>
-
-Adafruit_BNO055 bno = Adafruit_BNO055(55);
-
-#define BNO055_SAMPLERATE_DELAY_MS (10) //10-1000
-
-unsigned long lastUpdate;
-
-boolean gyroCalibrated = false;
-
-
-void updateIMU() {
-  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-
-  x = euler.x() + XOffset;
-  y = euler.y() + YOffset;
-  z = euler.z() + ZOffset;
-
-
-
-  // Get absolute X
-  float diff = x - lastX;
-  if (diff > 180)
-  {
-    XOffset -= 360;
-  }
-  else if (diff < -180)
-  {
-    XOffset += 360;
-  }
-
-  //  diff = y - lastY;
-  //  if (diff > 180)
-  //  {
-  //    YOffset -= 360;
-  //  }
-  //  else if (diff < -180)
-  //  {
-  //    YOffset += 360;
-  //  }
-  //
-
-  diff = z - lastZ;
-  if (diff > 180)
-  {
-    ZOffset -= 360;
-  }
-  else if (diff < -180)
-  {
-    ZOffset += 360;
-  }
-
-
-  x = euler.x() + XOffset;
-  y = euler.y() + YOffset;
-  z = euler.z() + ZOffset;
-
-  lastX = x;
-  lastY = y;
-  lastZ = z;
-}
-
-
-
-int gyroStatus(void)
-{
-  /* Get the four calibration values (0..3) */
-  /* Any sensor data reporting 0 should be ignored, */
-  /* 3 means 'fully calibrated" */
-  uint8_t system, gyro, accel, mag;
-  system = gyro = accel = mag = 0;
-  bno.getCalibration(&system, &gyro, &accel, &mag);
-
-  /* Display the individual values */
-  //  Serial.print(" G:");
-  //  Serial.println(gyro, DEC);
-  return gyro;
-}
 
 
 
@@ -910,12 +914,7 @@ void setup() {
   ySetpoint = 0;
   zSetpoint = 0;
 
-
   loadSettings(settings);
-
-
-
-
 
 }
 
@@ -976,8 +975,7 @@ void loop() {
 
     //PID/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    //updateY();
-    //updateZ();
+
 
 
     if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
@@ -1085,7 +1083,7 @@ void loop() {
     sprintf(c, " % +06.1f", x);//add + to positive numbers, leading zeros
     display.print(c);
 
-    display.setCursor(xCursor + colSpacing+6 , yCursor );
+    display.setCursor(xCursor + colSpacing + 6 , yCursor );
     display.print(" P: ");
     sprintf(c, " % +06.1f", y);
     display.print(c);
@@ -1104,7 +1102,7 @@ void loop() {
     sprintf(c, " % +06.1f", xSetpoint);//add + to positive numbers, leading zeros
     display.print(c);
 
-    display.setCursor(xCursor + colSpacing+6 , yCursor );
+    display.setCursor(xCursor + colSpacing + 6 , yCursor );
 
     display.print(" Y: ");
     sprintf(c, " % +06.1f", ySetpoint);
@@ -1130,13 +1128,13 @@ void loop() {
       if (enableMotorX) display.print(c);
       else display.print("  XXX%");
 
-    display.setCursor(xCursor + colSpacing+6 , yCursor );
+      display.setCursor(xCursor + colSpacing + 6 , yCursor );
       display.print(" Y: ");
       sprintf(c, " % +04.0f%%", yOutput / 255.0 * 100.0);
       if (enableMotorY) display.print(c);
       else display.print("  XXX%");
 
-    display.setCursor(xCursor + colSpacing * 2, yCursor);
+      display.setCursor(xCursor + colSpacing * 2, yCursor);
       display.print(" Z: ");
       sprintf(c, " % +04.0f%%", zOutput / 255.0 * 100.0);
       if (enableMotorZ) display.print(c);
