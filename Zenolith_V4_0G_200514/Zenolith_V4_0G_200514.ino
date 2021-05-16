@@ -120,7 +120,7 @@ boolean enableMotorX = true;
 boolean enableMotorY = true;
 boolean enableMotorZ = true;
 
-boolean enableParallelMotors = false;
+boolean enableParallelSetpoints = false;
 int motorSequence = 0;
 
 void runMotorX() {
@@ -238,6 +238,11 @@ void loadConfiguration(const char *filename, String UUID) {
   if (volume < 0)volume = 0;
   else if (volume > 3)volume = 3;
 
+
+  margin += doc[UUID]["margin"] | 0;
+
+
+
   setTTSVolume();
 
   const char *say = doc[UUID]["say"] | "error";
@@ -296,9 +301,17 @@ void loadConfiguration(const char *filename, String UUID) {
   enableMotorZ = doc[UUID]["enableMotorZ"] | int(enableMotorZ);
 
 
-  enableParallelMotors = doc[UUID]["enableParallelMotors"] | int(enableParallelMotors);
+  boolean enableAllMotors = doc[UUID]["enableAllMotors"] | 0 ;
+  if (enableAllMotors) {
+    enableMotors = true;
+    enableMotorX = true;
+    enableMotorY = true;
+    enableMotorZ = true;
+  }
 
-  if (!enableParallelMotors) {
+  enableParallelSetpoints = doc[UUID]["enableParallelSetpoints"] | int(enableParallelSetpoints);
+
+  if (!enableParallelSetpoints) {
     motorSequence = 0;
   }
 
@@ -985,7 +998,7 @@ void loop() {
         //test tracking
         //if(millis()>10000 && xSetpoint<180) xSetpoint+=2;
 
-        if (enableParallelMotors) {
+        if (enableParallelSetpoints) {
           xSetpoint = xSetpointFuture;
           ySetpoint = ySetpointFuture;
           zSetpoint = zSetpointFuture;
@@ -993,7 +1006,7 @@ void loop() {
         }
         else {
 
-          margin = 3; //margin
+          //margin = 3; //margin
           if (motorSequence < 10) {
             xSetpoint = xSetpointFuture;
 
@@ -1060,59 +1073,86 @@ void loop() {
     //display.setFont(&FreeMono9pt7b); //mono font
     display.setFont(&TomThumb); //mono font
 
-    display.print("IMU X: ");
+    int xCursor = 0;
+    int yCursor = 14;
+    int colSpacing = 43;
+    int rowSpacing = 7;
+
+    display.setCursor(xCursor, yCursor);
+
+    display.print("IMU Y: ");
     char c[12];
     sprintf(c, " % +06.1f", x);//add + to positive numbers, leading zeros
     display.print(c);
 
-    display.print(" Y: ");
+    display.setCursor(xCursor + colSpacing+6 , yCursor );
+    display.print(" P: ");
     sprintf(c, " % +06.1f", y);
     display.print(c);
 
-    display.print(" Z: ");
+    display.setCursor(xCursor + colSpacing * 2, yCursor);
+    display.print(" R: ");
     sprintf(c, " % +06.1f", z);
     display.print(c);
 
-    display.println();
+    //display.println();
+    yCursor += rowSpacing;
+    xCursor = 0;
+    display.setCursor(xCursor, yCursor);
 
-    display.print("SET X: ");
+    display.print("STP X: ");
     sprintf(c, " % +06.1f", xSetpoint);//add + to positive numbers, leading zeros
     display.print(c);
+
+    display.setCursor(xCursor + colSpacing+6 , yCursor );
 
     display.print(" Y: ");
     sprintf(c, " % +06.1f", ySetpoint);
     display.print(c);
 
+    display.setCursor(xCursor + colSpacing * 2, yCursor);
+
     display.print(" Z: ");
     sprintf(c, " % +06.1f", zSetpoint);
     display.print(c);
 
-    display.println();
+    //display.println();
 
+    yCursor += rowSpacing;
+    xCursor = 0;
+
+    display.setCursor(xCursor, yCursor);
     if (enableMotors) {
 
+
       display.print("SPD X: " );
-      sprintf(c, " % +06.1f", xOutput);//add + to positive numbers, leading zeros
+      sprintf(c, " % +04.0f%%", xOutput / 255.0 * 100.0); //add + to positive numbers, leading zeros
       if (enableMotorX) display.print(c);
-      else display.print("  XXX.X");
-      
+      else display.print("  XXX%");
+
+    display.setCursor(xCursor + colSpacing+6 , yCursor );
       display.print(" Y: ");
-      sprintf(c, " % +06.1f", yOutput);
+      sprintf(c, " % +04.0f%%", yOutput / 255.0 * 100.0);
       if (enableMotorY) display.print(c);
-      else display.print("  XXX.X");
+      else display.print("  XXX%");
 
-
+    display.setCursor(xCursor + colSpacing * 2, yCursor);
       display.print(" Z: ");
-      sprintf(c, " % +06.2f", zOutput);
+      sprintf(c, " % +04.0f%%", zOutput / 255.0 * 100.0);
       if (enableMotorZ) display.print(c);
-      else display.print("  XXX.X");
-      
+      else display.print("  XXX%");
+
     } else {
       display.print("MOTORS DISABLED" );
     }
-    display.println();
+    //display.println();
 
+
+    yCursor += rowSpacing;
+    xCursor = 0;
+    display.setCursor(xCursor, yCursor);
     int d = 2;
+
     display.print("P: ");
     display.print(Kp, d);
     display.print( " I: " );
@@ -1121,6 +1161,12 @@ void loop() {
     display.print(Kd, d);
 
     display.println();
+
+
+    display.print("MARGIN: " );
+    display.print(margin, 1);
+    display.print("  |  ");
+    //display.println();
 
     //gyro
     display.print( "GYRO: " );
@@ -1146,10 +1192,6 @@ void loop() {
     display.println();
 
 
-    display.print("margin: " );
-    display.print(margin, 1);
-    //display.print(" | ");
-    display.println();
 
 
     DateTime now = rtc.now();

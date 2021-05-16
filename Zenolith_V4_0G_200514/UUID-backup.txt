@@ -1,0 +1,24 @@
+{
+   "752221695":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":2,
+      "zSetpoint":0
+   },
+   "2755378472":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":3,
+      "zSetpoint":0
+   },
+   "486403839":{
+      "color":"white",
+      "xSetpoint":10,
+      "ySetpoint":4,
+      "zSetpoint":0
+   },
+   "78347042":{
+      "color":"red",
+      "enableMotors":0
+   }
+}
