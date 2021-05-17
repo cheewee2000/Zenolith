@@ -2,6 +2,8 @@
 #include <SPI.h>
 
 float margin = 5;
+int millisOffset = -1;
+int lastSecond = -1;
 
 //battery
 #define VBATPIN A6
@@ -196,6 +198,14 @@ void setTTSVolume() {
 
 //IMU  /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
+
+#define BNO055_SAMPLERATE_DELAY_MS (10) //10-1000
+
 //ranges
 //YAW X 0 360
 //PITCH X 0 -90 0 90 0
@@ -210,16 +220,6 @@ float lastX = 0;
 float lastY = 0;
 float lastZ = 0;
 
-
-
-//IMU/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BNO055.h>
-#include <utility/imumaths.h>
-
-Adafruit_BNO055 bno = Adafruit_BNO055(55);
-
-#define BNO055_SAMPLERATE_DELAY_MS (10) //10-1000
 
 unsigned long lastUpdate;
 
@@ -293,6 +293,11 @@ int gyroStatus(void)
   //  Serial.println(gyro, DEC);
   return gyro;
 }
+
+//RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "RTClib.h"
+//RTC_DS3231 rtc;
+RTC_PCF8523 rtc;
 
 
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -638,6 +643,23 @@ void logData() {
   // make a string for assembling the data to log:
   String dataString = "";
 
+  DateTime now = rtc.now();
+
+
+  if (lastSecond != -1 && now.second() != lastSecond && millisOffset == -1) {
+    millisOffset = millis() % 1000;
+  }
+
+  //if (lastSecond = 0) {
+  lastSecond = now.second();
+  //}
+
+
+  char t[60];
+  sprintf( t, "%02u/%02u/%02u %02u:%02u:%02u:%03u", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), (millis() - millisOffset)  % 1000 );
+  dataString += ",";
+  dataString += t;
+
   // read three sensors and append to the string:
   //  dataString += event.orientation.x;
   //  dataString += ",";
@@ -645,6 +667,7 @@ void logData() {
   //  dataString += ",";
   //  dataString += event.orientation.z;
   //  dataString += ",";
+  dataString += ",";
 
   dataString += id;
   dataString += ",";
@@ -674,32 +697,31 @@ void logData() {
   dataString += ",";
   dataString += Kd;
 
+  imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+
+  dataString += ",";
+  dataString += accel.x();
+  dataString += ",";
+  dataString += accel.y();
+  dataString += ",";
+  dataString += accel.z();
 
 
 
-
-  //  imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
-  //
-  //  dataString += ",";
-  //  dataString += accel.x();
-  //  dataString += ",";
-  //  dataString += accel.y();
-  //  dataString += ",";
-  //  dataString += accel.z();
 
 
 
 
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+  File dataFile = SD.open("datalog2.txt", FILE_WRITE);
 
   // if the file is available, write to it:
   if (dataFile) {
     dataFile.println(dataString);
     dataFile.close();
     // print to the serial port too:
-    //Serial.println(dataString);
+    Serial.println(dataString);
   }
   // if the file isn't open, pop up an error:
   else {
@@ -710,10 +732,6 @@ void logData() {
 
 
 
-//RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "RTClib.h"
-//RTC_DS3231 rtc;
-RTC_PCF8523 rtc;
 
 
 
@@ -762,7 +780,7 @@ void setup() {
   display.println();
 
   //  display.write("Press Button A to begin Motor Test");
-  //  display.println();
+  display.println();
 
 
   DateTime now = rtc.now();
