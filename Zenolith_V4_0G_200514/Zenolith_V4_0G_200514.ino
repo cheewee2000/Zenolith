@@ -101,9 +101,9 @@ float Kd = 4.0;
 
 
 
-PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);
-PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);
-PID zPID(&zInput, &zOutput, &zSetpoint, Kp, Ki, Kd, REVERSE);
+PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);//yaw
+PID yPID(&yInput, &yOutput, &ySetpoint, Kp, Ki, Kd, REVERSE);//pitch
+PID zPID(&zInput, &zOutput, &zSetpoint, Kp, Ki, Kd, DIRECT); //roll
 
 
 //motor/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -862,11 +862,6 @@ void setup() {
 
 
   //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
-  if (! rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    Serial.flush();
-    abort();
-  }
 
   if (rtc.lostPower()) {
     Serial.println("RTC lost power, let's set the time!");
