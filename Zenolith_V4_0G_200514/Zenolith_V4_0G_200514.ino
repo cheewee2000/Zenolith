@@ -166,6 +166,8 @@ void runMotorZ() {
 Uart Serial2 (&sercom0, A5, A4, SERCOM_RX_PAD_2, UART_TX_PAD_0);
 long lastTalk;
 int volume = 3;
+const char *say;
+
 
 void SERCOM0_0_Handler()
 {
@@ -332,7 +334,7 @@ void loadConfiguration(const char *filename, String UUID) {
 
   setTTSVolume();
 
-  const char *say = doc[UUID]["say"] | "error";
+  say = doc[UUID]["say"] | "error";
 
   //if it's a setpoint card enable motors
 
@@ -1096,9 +1098,15 @@ void loop() {
       display.setFont(&FreeMono9pt7b); //mono font
       display.print("ID: ");
       display.print(id);
+      display.setFont(); //normal font
+
       display.println();
 
-      display.setFont(); //normal font
+      display.print(say);
+      display.println();
+      display.println();
+
+
       DateTime now = rtc.now();
 
       char t[60];
@@ -1175,7 +1183,7 @@ void loop() {
       xCursor = 0;
 
       display.setCursor(xCursor, yCursor);
-      
+
       if (enableMotors) {
         display.print("SPD X: " );
         sprintf(c, " % +04.0f%%", xOutput / 255.0 * 100.0); //add + to positive numbers, leading zeros
