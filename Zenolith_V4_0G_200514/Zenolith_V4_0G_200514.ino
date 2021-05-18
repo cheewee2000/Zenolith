@@ -334,7 +334,7 @@ void loadConfiguration(const char *filename, String UUID) {
 
   setTTSVolume();
 
-  say = doc[UUID]["say"] | "error";
+  say = doc[UUID]["say"] | "n/a";
 
   //if it's a setpoint card enable motors
 
@@ -1261,8 +1261,8 @@ void loop() {
     }
 
     //bubble level
-    int xPos = display.width() - 20;
-    int yPos = display.height() - 20;
+    int xPos = display.width() - 15;
+    int yPos = display.height() - 15;
 
     display.drawCircle(xPos, yPos, 10, 1);
     float xArrow = cos(radians(xSetpoint - x)) * 15;
