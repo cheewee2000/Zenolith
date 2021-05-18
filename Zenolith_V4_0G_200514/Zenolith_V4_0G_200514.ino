@@ -1114,8 +1114,6 @@ void loop() {
       display.print(t);
 
 
-
-
     } else {
 
 
@@ -1125,9 +1123,8 @@ void loop() {
       display.print("ID: ");
       display.print(id);
       display.print(": ");
-
       display.println(cardId);
-
+      display.println(say);
       //display.setCursor(0, 6);
       display.setTextSize(1);
       //display.setFont(&Picopixel); //tiny font
@@ -1135,7 +1132,7 @@ void loop() {
       display.setFont(&TomThumb); //mono font
 
       int xCursor = 0;
-      int yCursor = 14;
+      int yCursor = 22;
       int colSpacing = 43;
       int rowSpacing = 7;
 
