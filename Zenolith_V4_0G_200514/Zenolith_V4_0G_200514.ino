@@ -15,14 +15,14 @@ boolean chargeMode = false;
 #include <Adafruit_SH110X.h>
 //#include <Fonts/Picopixel.h>
 //#include <Fonts/Org_01.h>
-//#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/FreeMono9pt7b.h>
 #include <Fonts/TomThumb.h>
 
 Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
 #define BUTTON_A  9
 #define BUTTON_B  6
 //#define BUTTON_C  5
-
+boolean flightModeUI;
 
 //json  /////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <ArduinoJson.h>
@@ -117,10 +117,10 @@ Adafruit_DCMotor *m1 = AFMS.getMotor(1);
 Adafruit_DCMotor *m2 = AFMS.getMotor(2);
 Adafruit_DCMotor *m4 = AFMS.getMotor(4);
 
-boolean enableMotors = false;
+boolean enableMotors = true;
 boolean enableMotorX = true;
-boolean enableMotorY = true;
-boolean enableMotorZ = true;
+boolean enableMotorY = false;
+boolean enableMotorZ = false;
 
 boolean enableParallelSetpoints = false;
 int motorSequence = 0;
@@ -465,6 +465,14 @@ void loadSettings(const char *filename) {
   Kd = doc["Kd"] | Kd;
   volume = doc["volume"] | volume;
   margin = doc["margin"] | margin;
+  enableMotors = doc["enableMotors"] | int(enableMotors);
+  enableMotorX = doc["enableMotorX"] | int(enableMotorX);
+  enableMotorY = doc["enableMotorY"] | int(enableMotorY);
+  enableMotorZ = doc["enableMotorZ"] | int(enableMotorZ);
+
+  enableParallelSetpoints = doc["enableParallelSetpoints"] | int(enableParallelSetpoints);
+  flightModeUI = doc["flightModeUI"] | int(flightModeUI);
+
 
   setTTSVolume();
 
@@ -501,6 +509,13 @@ void saveSettings(const char *filename) {
   doc["Kd"] = Kd;
   doc["volume"] = volume;
   doc["margin"] = margin;
+  doc["enableMotors"] = int(enableMotors);
+  doc["enableMotorX"] = int(enableMotorX);
+  doc["enableMotorY"] = int(enableMotorY);
+  doc["enableMotorZ"] = int(enableMotorZ);
+  doc["enableParallelSetpoints"] = int(enableParallelSetpoints);
+  doc["flightModeUI"] = int(flightModeUI);
+
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -1072,158 +1087,173 @@ void loop() {
 
 
     //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println();
 
-    display.setFont(); //normal font
-    display.print("ID: ");
-    display.print(id);
-    display.print(": ");
+    if ( flightModeUI ) {
+      display.setFont(&FreeMono9pt7b); //mono font
+      display.print("ID: ");
+      display.print(id);
+      display.println();
 
-    display.println(cardId);
+      display.setFont(); //normal font
+      DateTime now = rtc.now();
 
-    //display.setCursor(0, 6);
-    display.setTextSize(1);
-    //display.setFont(&Picopixel); //tiny font
-    //display.setFont(&FreeMono9pt7b); //mono font
-    display.setFont(&TomThumb); //mono font
-
-    int xCursor = 0;
-    int yCursor = 14;
-    int colSpacing = 43;
-    int rowSpacing = 7;
-
-    display.setCursor(xCursor, yCursor);
-
-    display.print("IMU Y: ");
-    char c[12];
-    sprintf(c, " % +06.1f", x);//add + to positive numbers, leading zeros
-    display.print(c);
-
-    display.setCursor(xCursor + colSpacing + 6 , yCursor );
-    display.print(" P: ");
-    sprintf(c, " % +06.1f", y);
-    display.print(c);
-
-    display.setCursor(xCursor + colSpacing * 2, yCursor);
-    display.print(" R: ");
-    sprintf(c, " % +06.1f", z);
-    display.print(c);
-
-    //display.println();
-    yCursor += rowSpacing;
-    xCursor = 0;
-    display.setCursor(xCursor, yCursor);
-
-    display.print("STP X: ");
-    sprintf(c, " % +06.1f", xSetpoint);//add + to positive numbers, leading zeros
-    display.print(c);
-
-    display.setCursor(xCursor + colSpacing + 6 , yCursor );
-
-    display.print(" Y: ");
-    sprintf(c, " % +06.1f", ySetpoint);
-    display.print(c);
-
-    display.setCursor(xCursor + colSpacing * 2, yCursor);
-
-    display.print(" Z: ");
-    sprintf(c, " % +06.1f", zSetpoint);
-    display.print(c);
-
-    //display.println();
-
-    yCursor += rowSpacing;
-    xCursor = 0;
-
-    display.setCursor(xCursor, yCursor);
-    if (enableMotors) {
+      char t[60];
+      sprintf( t, "%02u/%02u/%02u\n%02u:%02u:%02u:%03u", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), (millis() - millisOffset)  % 1000 );
+      display.print(t);
 
 
-      display.print("SPD X: " );
-      sprintf(c, " % +04.0f%%", xOutput / 255.0 * 100.0); //add + to positive numbers, leading zeros
-      if (enableMotorX) display.print(c);
-      else display.print("  XXX%");
 
-      display.setCursor(xCursor + colSpacing + 6 , yCursor );
-      display.print(" Y: ");
-      sprintf(c, " % +04.0f%%", yOutput / 255.0 * 100.0);
-      if (enableMotorY) display.print(c);
-      else display.print("  XXX%");
-
-      display.setCursor(xCursor + colSpacing * 2, yCursor);
-      display.print(" Z: ");
-      sprintf(c, " % +04.0f%%", zOutput / 255.0 * 100.0);
-      if (enableMotorZ) display.print(c);
-      else display.print("  XXX%");
 
     } else {
-      display.print("MOTORS DISABLED" );
+
+
+
+
+      display.setFont(); //normal font
+      display.print("ID: ");
+      display.print(id);
+      display.print(": ");
+
+      display.println(cardId);
+
+      //display.setCursor(0, 6);
+      display.setTextSize(1);
+      //display.setFont(&Picopixel); //tiny font
+      //display.setFont(&FreeMono9pt7b); //mono font
+      display.setFont(&TomThumb); //mono font
+
+      int xCursor = 0;
+      int yCursor = 14;
+      int colSpacing = 43;
+      int rowSpacing = 7;
+
+      display.setCursor(xCursor, yCursor);
+
+      display.print("IMU Y: ");
+      char c[12];
+      sprintf(c, " % +06.1f", x);//add + to positive numbers, leading zeros
+      display.print(c);
+
+      display.setCursor(xCursor + colSpacing + 6 , yCursor );
+      display.print(" P: ");
+      sprintf(c, " % +06.1f", y);
+      display.print(c);
+
+      display.setCursor(xCursor + colSpacing * 2, yCursor);
+      display.print(" R: ");
+      sprintf(c, " % +06.1f", z);
+      display.print(c);
+
+      //display.println();
+      yCursor += rowSpacing;
+      xCursor = 0;
+      display.setCursor(xCursor, yCursor);
+
+      display.print("STP X: ");
+      sprintf(c, " % +06.1f", xSetpoint);//add + to positive numbers, leading zeros
+      display.print(c);
+
+      display.setCursor(xCursor + colSpacing + 6 , yCursor );
+
+      display.print(" Y: ");
+      sprintf(c, " % +06.1f", ySetpoint);
+      display.print(c);
+
+      display.setCursor(xCursor + colSpacing * 2, yCursor);
+
+      display.print(" Z: ");
+      sprintf(c, " % +06.1f", zSetpoint);
+      display.print(c);
+
+      //display.println();
+
+      yCursor += rowSpacing;
+      xCursor = 0;
+
+      display.setCursor(xCursor, yCursor);
+      
+      if (enableMotors) {
+        display.print("SPD X: " );
+        sprintf(c, " % +04.0f%%", xOutput / 255.0 * 100.0); //add + to positive numbers, leading zeros
+        if (enableMotorX) display.print(c);
+        else display.print("  XXX%");
+
+        display.setCursor(xCursor + colSpacing + 6 , yCursor );
+        display.print(" Y: ");
+        sprintf(c, " % +04.0f%%", yOutput / 255.0 * 100.0);
+        if (enableMotorY) display.print(c);
+        else display.print("  XXX%");
+
+        display.setCursor(xCursor + colSpacing * 2, yCursor);
+        display.print(" Z: ");
+        sprintf(c, " % +04.0f%%", zOutput / 255.0 * 100.0);
+        if (enableMotorZ) display.print(c);
+        else display.print("  XXX%");
+
+      } else {
+        display.print("MOTORS DISABLED" );
+      }
+      //display.println();
+
+
+      yCursor += rowSpacing;
+      xCursor = 0;
+      display.setCursor(xCursor, yCursor);
+      int d = 2;
+
+      display.print("P: ");
+      display.print(Kp, d);
+      display.print( " I: " );
+      display.print(Ki, d);
+      display.print( " D: " );
+      display.print(Kd, d);
+
+      display.println();
+
+
+      display.print("MARGIN: " );
+      display.print(margin, 1);
+      display.print("  |  ");
+      //display.println();
+
+      //gyro
+      display.print( "GYRO: " );
+      display.print(gyroStatus());
+
+      display.println();
+
+      //battery
+      if (millis() % 10000 < 100)
+      {
+        measuredvbat = analogRead(VBATPIN);
+        measuredvbat *= 2;    // we divided by 2, so multiply back
+        measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+        measuredvbat /= 1024; // convert to voltage
+        //      measuredvbat = measuredvbat - 3.20; //3.2-4.2
+        //      measuredvbat = measuredvbat * 100;
+      }
+      display.print("BAT: " );
+      display.print(measuredvbat, 2);
+      display.print("V ");
+
+      display.print(" | ");
+
+      display.print("PRLL: " );
+      display.print(enableParallelSetpoints);
+      display.println();
+
+
+
+      DateTime now = rtc.now();
+      char t[60];
+      sprintf( t, "%02u/%02u/%02u %02u:%02u:%02u:%03u", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), (millis() - millisOffset)  % 1000 );
+      display.print(t);
+      display.println();
     }
-    //display.println();
-
-
-    yCursor += rowSpacing;
-    xCursor = 0;
-    display.setCursor(xCursor, yCursor);
-    int d = 2;
-
-    display.print("P: ");
-    display.print(Kp, d);
-    display.print( " I: " );
-    display.print(Ki, d);
-    display.print( " D: " );
-    display.print(Kd, d);
-
-    display.println();
-
-
-    display.print("MARGIN: " );
-    display.print(margin, 1);
-    display.print("  |  ");
-    //display.println();
-
-    //gyro
-    display.print( "GYRO: " );
-    display.print(gyroStatus());
-
-    display.println();
-
-    //battery
-    if (millis() % 10000 < 100)
-    {
-      measuredvbat = analogRead(VBATPIN);
-      measuredvbat *= 2;    // we divided by 2, so multiply back
-      measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-      measuredvbat /= 1024; // convert to voltage
-      //      measuredvbat = measuredvbat - 3.20; //3.2-4.2
-      //      measuredvbat = measuredvbat * 100;
-    }
-    display.print("BAT: " );
-    display.print(measuredvbat, 2);
-    display.print("V ");
-
-    //display.print(" | ");
-    display.println();
-
-
-
-
-    DateTime now = rtc.now();
-    display.print("UTC: ");
-    display.print(now.year(), DEC);
-    display.print('/');
-    display.print(now.month(), DEC);
-    display.print('/');
-    display.print(now.day(), DEC);
-    display.print("  ");
-    display.print(now.hour(), DEC);
-    display.print(':');
-    display.print(now.minute(), DEC);
-    display.print(':');
-    display.print(now.second(), DEC);
-    display.println();
 
     //bubble level
     int xPos = display.width() - 20;
@@ -1260,15 +1290,9 @@ void loop() {
   }
   //buttons/////////////////////////////////////////////////////////////////////////////////////////////////////////
   if (!digitalRead(BUTTON_A)) {
-    Kp += 0.1;
-    xPID.SetTunings( Kp,  Ki,  Kd);
-    // Debounce
+    flightModeUI = !flightModeUI;
     delay(100);
 
-    m1->setSpeed(0);
-    m2->setSpeed(0);
-    m4->setSpeed(0);
-    delay(1000);
   }
 
   if (!digitalRead(BUTTON_B)) {
