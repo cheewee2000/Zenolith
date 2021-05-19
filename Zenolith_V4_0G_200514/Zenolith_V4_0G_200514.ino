@@ -671,10 +671,9 @@ void logData() {
   lastSecond = now.second();
   //}
 
-
+  //time
   char t[60];
   sprintf( t, "%02u/%02u/%02u %02u:%02u:%02u:%03u", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), (millis() - millisOffset)  % 1000 );
-  dataString += ",";
   dataString += t;
 
   // read three sensors and append to the string:
@@ -686,8 +685,10 @@ void logData() {
   //  dataString += ",";
   dataString += ",";
 
+  //ID
   dataString += id;
   dataString += ",";
+  //cared
   dataString += cardId;
   dataString += ",";
   dataString += gyroStatus();
@@ -765,7 +766,7 @@ void logData() {
 void setup() {
 
   Serial.begin(9600);
-  delay(5000);
+  delay(1000);
   Serial.println("Hello");
 
   //display/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -834,14 +835,11 @@ void setup() {
 
     while (1);
   }
-  delay(1000);
+  delay(100);
   bno.setExtCrystalUse(true);
 
-
-
   //gyroStatus();
-
-
+  
   //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   Serial.print("Initializing SD card...");
@@ -858,9 +856,6 @@ void setup() {
   }
   Serial.println("card initialized.");
 
-
-
-
   //RTC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   if (rtc.lostPower()) {
@@ -875,11 +870,7 @@ void setup() {
 
   //rtc.adjust(DateTime(2020, 5, 14, 3, 36, 0));
   rtc.start();
-
   delay(50);
-
-
-
 
 
   //TTS/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -931,18 +922,22 @@ void setup() {
   AFMS.begin();  // create with the default frequency 1.6KHz
   delay(50);
   Serial.println("motors on");
-
+  m1->setSpeed(0);
+  m2->setSpeed(0);
+  m4->setSpeed(0);
 
   //PID /////////////////////////////////////////////////////////////////////////////////////////////////////////
+  xSetpoint = 0;
+  ySetpoint = 0;
+  zSetpoint = 0;
+  
   xPID.SetMode(AUTOMATIC);
   xPID.SetOutputLimits(-255, 255);
   yPID.SetMode(AUTOMATIC);
   yPID.SetOutputLimits(-255, 255);
   zPID.SetMode(AUTOMATIC);
   zPID.SetOutputLimits(-255, 255);
-  xSetpoint = 0;
-  ySetpoint = 0;
-  zSetpoint = 0;
+
 
   loadSettings(settings);
 
@@ -1009,9 +1004,17 @@ void loop() {
 
 
     if ((millis() - lastUpdate) > BNO055_SAMPLERATE_DELAY_MS) {
+
+
+      //PID xPID(&xInput, &xOutput, &xSetpoint, Kp, Ki, Kd, DIRECT);//yaw
+
+
+
       //update IMU and PID together
       updateIMU();
       xInput = x;
+      //deadbands
+      //
       xPID.Compute();
       yInput = y;
       yPID.Compute();
