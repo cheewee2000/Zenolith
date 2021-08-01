@@ -593,10 +593,10 @@ uint32_t getCardId(uint8_t uid[], uint8_t uidLength) {
 }
 
 void printCardInfo(uint8_t uid[], uint8_t uidLength) {
-  Serial.println("***********************");
-  Serial.println("Found an ISO14443A card !!");
-  Serial.print("  UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
-  Serial.print("  UID Value: ");
+  //Serial.println("***********************");
+  //Serial.println("Found an ISO14443A card !!");
+  //Serial.print("  UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
+  //Serial.print("  UID Value: ");
   nfc.PrintHex(uid, uidLength);
 
   if (uidLength == 4)
@@ -609,17 +609,17 @@ void printCardInfo(uint8_t uid[], uint8_t uidLength) {
     cardid |= uid[2];
     cardid <<= 8;
     cardid |= uid[3];
-    Serial.print("Seems to be a Mifare Classic card #");
+    //Serial.print("Seems to be a Mifare Classic card #");
     Serial.println(cardid);
   }
   Serial.println("");
-  Serial.println("***********************");
+  //Serial.println("***********************");
 }
 
 void handleNFCDetected() {
-  Serial.println("**********");
+  //Serial.println("**********");
   Serial.println("Got NFC IRQ");
-  Serial.println("**********");
+  //Serial.println("**********");
 
   uint8_t success = false;
   uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };  // Buffer to store the returned UID
@@ -631,7 +631,7 @@ void handleNFCDetected() {
 
   if (success) {
     cardId = getCardId(uid, uidLength);
-    Serial.print("Found card : ");
+    //Serial.print("Found card : ");
     Serial.println(cardId );
 
     loadConfiguration(filename, String(cardId));
@@ -839,7 +839,7 @@ void setup() {
   bno.setExtCrystalUse(true);
 
   //gyroStatus();
-  
+
   //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   Serial.print("Initializing SD card...");
@@ -930,7 +930,7 @@ void setup() {
   xSetpoint = 0;
   ySetpoint = 0;
   zSetpoint = 0;
-  
+
   xPID.SetMode(AUTOMATIC);
   xPID.SetOutputLimits(-255, 255);
   yPID.SetMode(AUTOMATIC);
@@ -987,11 +987,11 @@ void loop() {
     if ( !gyroCalibrated ) {
       if (gyroStatus() == 3 && millis() - lastTalk > 6000) {
         //delay(5000);
-        Serial2.write("SReady\n");
+        //Serial2.write("SReady\n");
         gyroCalibrated = true;
       }
       else if (millis() < 20000 && millis() - lastTalk > 6000) {
-        Serial2.write("SCalibrating gyro. Stand still.\n");
+        //Serial2.write("SCalibrating gyro. Stand still.\n");
         lastTalk = millis();
       }
     }
@@ -1062,8 +1062,7 @@ void loop() {
         runMotorY();
         runMotorZ();
 
-        //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
-        logData();
+
       }
       else {
         m1->setSpeed(0);
@@ -1071,6 +1070,8 @@ void loop() {
         m4->setSpeed(0);
       }
     }
+    //datalogger/////////////////////////////////////////////////////////////////////////////////////////////////////////
+    logData();
 
     //NFC/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1080,7 +1081,7 @@ void loop() {
     if (listeningToNFC && irqCurr == LOW && irqPrev == HIGH) {
       handleNFCDetected();
     } else if (irqCurr == LOW && irqPrev == HIGH) {
-      Serial.println("##### Got IRQ while not listening..");
+      //Serial.println("##### Got IRQ while not listening..");
     }
 
     irqPrev = irqCurr;
